@@ -1,0 +1,177 @@
+{% import 'admin/layout.html' as layout with context -%}
+{% extends 'admin/base.html' %}
+
+{% block head_meta %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="description" content="au theme template">
+<meta name="author" content="Hau Nguyen">
+<meta name="keywords" content="au theme template">
+{% endblock %}
+
+{% block head_tail %}
+<link rel="icon" href="{{url_for('static', filename='images/Dsa_icon.png')}}" sizes="32x32" type="image">
+
+<!-- Fontfaces CSS-->
+<link href="{{url_for('static', filename='system_dashboard/css/font-face.css')}}" rel="stylesheet" media="all">
+<link href="{{url_for('static', filename='vendor/font-awesome-4.7/css/font-awesome.min.css')}}" rel="stylesheet" media="all">
+<link href="{{url_for('static', filename='vendor/mdi-font/css/material-design-iconic-font.min.css')}}" rel="stylesheet" media="all">
+
+<!-- Main CSS-->
+<link href="{{url_for('static', filename='css/theme.css')}}" rel="stylesheet" media="all">
+<link href="{{url_for('static', filename='css/style.css')}}" rel="stylesheet" media="all">
+{{ super() }}
+{% endblock %}
+
+{% block page_body %}
+<div class="page-wrapper">
+    {% if current_user.is_authenticated %}
+    <!-- MENU SIDEBAR-->
+    <aside class="menu-sidebar d-none d-lg-block">
+        <div class="logo">
+            <a href="#">
+                <img src="{{url_for('static', filename='images/logo_ngang.png')}}" width="160" alt="Dsa Company" />
+            </a>
+        </div>
+        <div class="sidebar">
+            <nav class="mt-2 navbar-sidebar2">
+                <ul class="nav nav-pills nav-sidebar flex-column navbar__list" data-widget="treeview" role="menu"
+                    data-accordion="false">
+                    {% set position = 'Home' if admin_view.name=='Home' else admin_view.name %}
+                    {% set pages = {position: 'active'} %}
+                    <li class="nav-item">
+                        <a href="/admin/" class="nav-link {{ pages['Users'] or '' }} js-arrow">
+                            <i class="nav-icon fa fa-user-circle-o"></i>
+                            <p class="menu_content">
+                                Người dùng
+                            </p>
+                        </a>
+
+                    </li>
+                    <li class="nav-item">
+                        <a href="/admin/roles/" class="nav-link {{ pages['Roles'] or '' }} js-arrow">
+                            <i class="nav-icon fa fa-tasks"></i>
+                            <p class="menu_content">
+                                Quyền
+                            </p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/home/" class="nav-link js-arrow">
+                            <i class="nav-icon fa fa-line-chart"></i>
+                            <p class="menu_content">
+                                Dashboard
+                            </p>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </aside>
+    <!-- END MENU SIDEBAR-->
+
+    <!-- PAGE CONTAINER-->
+    <div class="page-container">
+
+        <!-- HEADER DESKTOP-->
+        <header class="header-desktop">
+            <div class="section__content section__content--p30">
+                <div class="container-fluid">
+                    <div class="pull-right">
+                        <div class="header-button ">
+                            
+                            <a href="{{ url_for('security.logout') }}" class="btn btn-success"><i class="fa fa-power-off" aria-hidden="true"></i></a>
+                            <!-- <div class="account-wrap">
+                                <div class="account-item clearfix js-item-menu">
+                                    <div class="image">
+                                        <img src="{{ url_for('static', filename='images/icon/avatar-01.jpg') }}" alt="Administrator" />
+                                    </div>
+                                    <div class="content">
+                                        <a class="js-acc-btn" href="#">Nguyễn Hữu Hùng</a>
+                                    </div>
+                                    <div class="account-dropdown js-dropdown">
+                                        <div class="info clearfix">
+                                            <div class="image">
+                                                <a href="#">
+                                                    <img src="{{ url_for('static', filename='images/icon/avatar-01.jpg') }}" alt="John Doe" />
+                                                </a>
+                                            </div>
+                                            <div class="content">
+                                                <h5 class="name">
+                                                    <a href="#">john doe</a>
+                                                </h5>
+                                                <span class="email">johndoe@example.com</span>
+                                            </div>
+                                        </div>
+                                        <div class="account-dropdown__body">
+                                            <div class="account-dropdown__item">
+                                                <a href="#">
+                                                    <i class="zmdi zmdi-account"></i>Account</a>
+                                            </div>
+                                            <div class="account-dropdown__item">
+                                                <a href="#">
+                                                    <i class="zmdi zmdi-settings"></i>Setting</a>
+                                            </div>
+                                            <div class="account-dropdown__item">
+                                                <a href="#">
+                                                    <i class="zmdi zmdi-money-box"></i>Billing</a>
+                                            </div>
+                                        </div>
+                                        <div class="account-dropdown__footer">
+                                            <a href="#">
+                                                <i class="zmdi zmdi-power"></i>Logout</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div> -->
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <!-- HEADER DESKTOP-->
+        
+        <!-- MAIN CONTENT-->
+        <div class="main-content">
+            <div class="section__content--p30">
+                <div class="container-fluid">
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            {% endif %}
+                            {% block tools %}{% endblock %}
+                            {{ layout.messages() }}
+                            {% set render_ctx = h.resolve_ctx() %}
+                            {% block body %}
+                            {% endblock %}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <!-- END MAIN CONTENT-->
+
+    </div>
+    <!-- END PAGE CONTAINER-->
+
+    <div id="ls"></div>
+
+    {%- if admin_view.name == 'Users' -%}
+    <div class="modal fade" id="modal_check" tabindex="-1" role="dialog" aria-labelledby="resetPassModalLabel" aria-hidden="true", style="z-index: 1060;">
+        <div class="modal-dialog" role="document">
+            <div id="modal_content" class="modal-content"></div>
+        </div>
+    </div>
+    {%- endif -%}
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{super()}}
+{%- if admin_view.name == 'Users' -%}
+<script src="{{url_for('protected', filename='js/poda.js')}}"></script>
+<script src="{{url_for('protected', filename='js/custom.js')}}"></script>
+{%- endif -%}
+{% endblock %}

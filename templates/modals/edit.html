@@ -1,0 +1,37 @@
+{% import 'admin/static.html' as admin_static with context%}
+{% import 'libs_org/lib.html' as lib with context %}
+{% set render_ctx = h.resolve_ctx() %}
+
+{% block body %}
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    {% block header_text %}
+      <h3>{{ "CHỈNH SỬA HỒ SƠ" + ' #' + request.args.get('id') }}</h3>
+    {% endblock %}
+  </div>
+  <div class="modal-body">
+    {# "save and continue" button is removed from modal (it won't function properly) #}
+    {% block edit_form %}
+      {{ lib.render_form(form, return_url, extra=None, form_opts=form_opts,
+                         action=url_for('.edit_view', id=request.args.get('id'), url=return_url),
+                         is_modal=True) }}
+    {% endblock %}
+  </div>
+{% endblock %}
+
+{% block tail %}
+  {%- if admin_view.name == 'Users' -%}
+  <script src="{{url_for('static', filename='js/message_error.js')}}"></script>
+  <script src="{{url_for('protected', filename='js/checking.js')}}"></script>
+
+  <script>
+    fp();
+    $(document).ready(function() {
+        var btn_save = $(".btn-primary");
+        btn_save.attr("type", "button");
+        btn_save.attr("onclick", "chk_info('E', '{{request.args.get('id')}}');");
+    });
+  </script>
+  {% endif %}
+  <script src="{{ admin_static.url(filename='admin/js/bs3_modal.js', v='1.0.0') }}"></script>
+{% endblock %}

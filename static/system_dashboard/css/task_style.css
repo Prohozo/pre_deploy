@@ -1,0 +1,162 @@
+body {
+    background-color: rgb(229, 229, 229) !important;
+    font-family: "nunito";
+}
+
+a {
+    font-family: "nunito";
+}
+
+.btn_in_title {
+    margin-right: 5px !important;
+    padding: 0 6px !important;
+    background-color: #3d543c;
+    border-color: #255423;
+    display: inline-grid;
+    align-items: center;
+    justify-items: center;
+}
+
+#end_date {
+    width: 140px !important;
+    font-size: 17px !important;
+}
+
+#start_date {
+    width: 140px !important;
+    font-size: 17px !important;
+}
+
+.title_dash {
+    background: linear-gradient(125deg, #1995fb 0%, #25ddc8 100%);
+    /* background-image: linear-gradient(135deg, #a0d468 0%,#6dae26 80%) !important;  */
+    margin-bottom: 20px;
+    margin-right: 40px;
+    margin-left: 55px;
+    border-radius: 10px;
+}
+
+#btn_R {
+    margin-right: 10px !important;
+}
+
+#title-top {
+    margin: auto !important;
+}
+
+.VirtualizedSelectOption {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* .modebar-container {
+    visibility: hidden !important;
+} */
+
+#detail_KhoXe {
+    width: 100%;
+    height: 100%;
+}
+
+#detail_MauXe_DG {
+    width: 100%;
+    height: 100%;
+}
+
+#detail_Xe_DG_TG {
+    width: 100%;
+    height: 100%;
+}
+
+#detail_XE_MAUXE {
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+
+/* Style new 10/12/2020 */
+
+.ov {
+    height: 100%;
+    width: 100%;
+    color: #fff;
+}
+
+.ov .content-ov {
+    width: 100%;
+    height: 100%;
+    text-transform: uppercase;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.title_above {
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.ov .content-ov .value {
+    font-size: 2.7vh;
+    font-weight: 700;
+}
+
+.title_below {
+    text-transform: uppercase;
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.ov .icon-ov {
+    width: 100%;
+    height: 100%;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov .icon-ov img {
+    max-width: 90%;
+    max-height: 90%;
+    height: 90%;
+}
+
+.ele_row {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    /* margin:0 -15px; */
+}
+.dash-table-container {
+    height: 75%;
+}
+#account_detail.dash-table-container {
+    height: 60%;
+}
+#user_without_activity.dash-table-container {
+    height: 100%;
+}
+#user_without_login.dash-table-container {
+    height: 100%;
+}
+#detail_PROJECT.dash-table-container {
+    height: 100%;
+}
+#detail_project_task.dash-table-container {
+    height: 100%;
+}
+#user_0_login.dash-table-container {
+    height: 100%;
+}
+#user_0_task.dash-table-container {
+    height: 100%;
+}
+#detail_task_delay.dash-table-container {
+    height: 350%;
+}
+
+#detail_user_workload.dash-table-container {
+    height: 100%;
+}

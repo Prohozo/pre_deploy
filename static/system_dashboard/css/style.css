@@ -1,0 +1,248 @@
+body {
+    background-color: rgb(229, 229, 229) !important;
+    font-family: "nunito";
+}
+
+a {
+    font-family: "nunito";
+}
+
+.btn_in_title {
+    margin-right: 5px !important;
+    padding: 0 6px !important;
+    background-color: #3d543c;
+    border-color: #255423;
+    display: inline-grid;
+    align-items: center;
+    justify-items: center;
+}
+
+#end_date {
+    width: 140px !important;
+    font-size: 10px !important;
+}
+
+#start_date {
+    width: 140px !important;
+    font-size: 10px !important;
+}
+.DateInput_input {
+    background-color: white;
+    color: black;
+}
+.DateRangePickerInput {
+    background-color: white;
+    display: inline-block;
+}
+.DateRangePickerInput_arrow_svg {
+    vertical-align: middle;
+    fill: black;
+    height: 24px;
+    width: 24px;
+}
+.CalendarMonth {
+    background: white;
+}
+.CalendarMonthGrid {
+    background: white;
+    z-index: 0;
+}
+.CalendarMonth_caption {
+    color: black;
+    font-size: 18px;
+    text-align: center;
+    padding-top: 22px;
+    padding-bottom: 37px;
+    caption-side: initial;
+}
+.DayPicker_weekHeader {
+    color: black;
+    position: absolute;
+    top: 62px;
+    z-index: 2;
+}
+.DayPickerNavigation_button__default {
+    border: 1px solid black;
+    background-color: white;
+    color: black;
+}
+.DayPickerNavigation_svg__horizontal {
+    fill: black;
+}
+.DayPicker__horizontal {
+    background: white;
+}
+
+.CalendarDay__blocked_out_of_range,
+.CalendarDay__blocked_out_of_range:active,
+.CalendarDay__blocked_out_of_range:hover {
+    background: #e5e5e5 !important;
+    color: black !important;
+}
+.CalendarDay__default {
+    border: 1px solid #e5e5e5;
+    color: black;
+    background: white;
+}
+.CalendarDay__default:hover {
+    background: #66e2da;
+    border: 1px double #66e2da;
+    color: white;
+}
+
+.CalendarDay__selected,
+.CalendarDay__selected:active,
+.CalendarDay__selected:hover {
+    background: #66e2da !important;
+    border: 1px double #66e2da !important;
+    color: black !important;
+}
+.CalendarDay__blocked_minimum_nights {
+    background: white;
+    border: 1px solid #e5e5e5;
+    color: black;
+}
+.CalendarDay__selected_span {
+    background: #66e2da !important;
+    border: 1px double #66e2da !important;
+    color: black !important;
+}
+.CalendarDay__selected_span:hover {
+    background: #66e2da !important;
+    border: 1px double #66e2da !important;
+    color: white !important;
+}
+
+.title_dash {
+    background: linear-gradient(125deg, #1995fb 0%, #25ddc8 100%);
+    /* background-image: linear-gradient(135deg, #a0d468 0%,#6dae26 80%) !important;  */
+    margin-bottom: 20px;
+    margin-right: 40px;
+    margin-left: 55px;
+    border-radius: 10px;
+}
+
+#btn_R {
+    margin-top: 1% !important;
+    margin-left: 90% !important;
+    background-color: indianred;
+    border-color: indianred;
+}
+
+#title-top {
+    margin: auto !important;
+}
+
+.VirtualizedSelectOption {
+    background-color: white;
+    color: black;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VirtualizedSelectFocusedOption {
+    background-color: #66e2da;
+    font-size: 18px;
+    color: white;
+}
+.Select-control {
+    background-color: rgb(255, 255, 255) !important;
+    color: rgb(25, 25, 25) !important;
+}
+.Select-value-label {
+    line-height: 45px;
+    color: rgb(25, 25, 25) !important;
+}
+
+.Select,
+.Select div,
+.Select input,
+.Select span {
+    color: #191919;
+}
+.Select-placeholder {
+    line-height: 45px;
+    font-size: 18px;
+}
+
+/* 
+.modebar-container {
+    visibility: hidden !important;
+} */
+
+#detail_KhoXe {
+    width: 100%;
+    height: 100%;
+}
+
+#detail_MauXe_DG {
+    width: 100%;
+    height: 100%;
+}
+
+#detail_Xe_DG_TG {
+    width: 100%;
+    height: 100%;
+}
+
+#detail_XE_MAUXE {
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+
+/* Style new 10/12/2020 */
+
+.ov {
+    height: 100%;
+    width: 100%;
+    color: #fff;
+}
+
+.ov .content-ov {
+    width: 100%;
+    height: 100%;
+    text-transform: uppercase;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.title_above {
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.ov .content-ov .value {
+    font-size: 2.7vh;
+    font-weight: 700;
+}
+
+.title_below {
+    text-transform: uppercase;
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.ov .icon-ov {
+    width: 100%;
+    height: 100%;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov .icon-ov img {
+    max-width: 90%;
+    max-height: 90%;
+    height: 90%;
+}
+
+.ele_row {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    /* margin:0 -15px; */
+}

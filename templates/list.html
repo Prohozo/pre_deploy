@@ -1,0 +1,67 @@
+{% extends 'admin/model/list.html' %}
+{% import 'admin/model/layout.html' as model_layout with context %}
+{% import 'admin/lib.html' as lib with context %}
+
+{% block tools %}
+  <div class="table-data__tool">
+    <div class="table-data__tool-left">
+      {% if admin_view.name == 'Users' %}
+      {% set btn_name = 'tài khoản' if admin_view.name == 'Users' else 'quyền' %}
+      {%- if admin_view.create_modal -%}
+        {{ lib.add_modal_button(url=get_url('.create_view', url=return_url, modal=True), btn_class="au-btn au-btn-icon au-btn--green au-btn--small", content="Thêm "+btn_name) }}
+      {% else %}
+        <a href="{{ get_url('.create_view', url=return_url) }}">Thêm người dùng</a>
+      {%- endif -%}
+      <a class="au-btn au-btn-icon au-btn--green au-btn--small" href="javascript:void(0)" onclick="del_excute();">Xoá {{ btn_name }}</a>
+      {%- endif -%}
+    </div>
+
+    <div class="table-data__tool-right">
+      {{ model_layout.search_form(input_class='au-input') }}
+    </div>
+  </div>
+  <div class="clearfix"></div>
+  <hr>
+{% endblock %}
+
+{% block list_header scoped %}
+      {% if actions %}
+      <th class="list-checkbox-column">
+          <input type="checkbox" name="rowtoggle" class="action-rowtoggle" title="{{ _gettext('Select all records') }}" />
+      </th>
+      {% endif %}
+      {% block list_row_actions_header %}
+          {% if admin_view.column_display_actions %}
+            <th class="col-md-1">&nbsp;</th>
+          {% endif %}
+      {% endblock %}
+      
+      {% for c, name in list_columns %}
+        {% set column = loop.index0 %}
+        <th class="column-header col-{{c}}">
+          {{ name.upper() }}
+        </th>
+      {% endfor %}
+{% endblock %}
+
+{% block list_row_actions %}
+  {% set l_r_a = list_row_actions[:-1] if admin_view.name == 'Users' else list_row_actions %}
+  {% for action in l_r_a %}
+  {{ action.render_ctx(get_pk_value(row), row) }}
+  {% endfor %}
+  {%- if admin_view.name == 'Users' -%}
+  <form class="icon" method="POST" action="{{ get_url('.delete_view') }}">
+    <input id="id" name="id" required="" type="hidden" value="{{get_pk_value(row)}}">
+    <input id="url" name="url" type="hidden" value="{{return_url}}">
+    <button id='del_{{get_pk_value(row)}}' data-toggle="modal" data-target="#modal_check" onclick="gen_modal('{{get_pk_value(row)}}', '1')" type="button">
+        <i class="fa fa-trash glyphicon glyphicon-trash"></i>
+    </button>
+  </form>
+  <a class="icon" href="#" id="{{get_pk_value(row)}}" data-toggle="modal" data-target="#modal_check" onclick="gen_modal(this.id);">
+    <span class="fa fa-refresh"></span>
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block model_menu_bar %}
+{% endblock %}

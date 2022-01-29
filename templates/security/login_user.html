@@ -1,0 +1,92 @@
+{% extends 'admin/master.html' %}
+{% from "security/_macros.html" import render_field, render_field_text, render_errors %}
+{% include "security/_messages.html" %}
+
+{% block title %}
+Login
+{% endblock %}
+
+{% block head_tail %}
+{% endblock %}
+
+{% block head_css %}
+<link rel="icon" href="{{url_for('static', filename='images/Dsa_icon.png')}}" sizes="32x32" type="image">
+<link href="{{url_for('static', filename='system_dashboard/css/font-face.css')}}" rel="stylesheet" media="all">
+<link href="{{url_for('static', filename='vendor/bootstrap-4.1/bootstrap.min.css')}}" rel="stylesheet" media="all">
+<link href="{{url_for('static', filename='css/theme.css')}}" rel="stylesheet" media="all">
+<link href="{{url_for('static', filename='css/style.css')}}" rel="stylesheet" media="all">
+<style>
+    #content1 {
+        background-image: url("{{url_for('static', filename='images/bg1.jpg')}}");
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+    .page-wrapper {
+        padding-bottom: 0;
+    }
+
+    .login-wrap {
+        padding-top: 18vh;
+        padding-bottom: 13vh;
+    }
+
+    .page-content--bge5 {
+        height: auto !important;
+        min-height: 100vh !important;
+    }
+
+    .login-content {
+        border-radius: 10px;
+    }
+
+    .title-login {
+        font-size: 40px;
+        margin: 10px 0;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+{{ super() }}
+<div class="page-content--bge5" id='content1'>
+    <div class="container">
+        <div class="login-wrap">
+            <div class="login-content">
+
+                <div class="login-logo">
+                    <a href="#">
+                        <img src="{{url_for('static', filename='system_dashboard/images/fast-logo.png')}}" width="120" alt="Dsa company">
+                    </a>
+                </div>
+
+                <div class="login-form">
+
+                    <form id="sign_in" action="{{ url_for_security('login') }}" method="POST" name="login_user_form">
+                        {{ login_user_form.hidden_tag() }}
+                        {{ render_field_text(login_user_form.email) }}
+
+                        <div class="form-group">
+                            <label for="password">Mật khẩu</label>
+                            <input class="form-control" id="password" name="password" required="" type="hidden" value="">
+                            <input class="form-control" id="pwd" required="" type="password" value="">
+                        </div>
+                        {{ render_errors(login_user_form.email) }}
+                        {{ render_errors(login_user_form.password) }}
+                        {{ render_field(login_user_form.next) }}
+                        {{ render_field(login_user_form.submit, class="btn btn-primary") }}
+                    </form>
+                </div>
+            </div>
+            <div id="ls"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail_js %}
+{{ super() }}
+<script src="{{url_for('static', filename='js/9557820.crt.js')}}"></script>
+<script src="{{url_for('static', filename='js/72425ioue.encdsa.js')}}"></script>
+{% endblock %}

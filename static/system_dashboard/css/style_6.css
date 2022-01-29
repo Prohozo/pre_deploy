@@ -1,0 +1,753 @@
+body {
+    margin: 0;
+    padding: 0;
+    color: #000 !important;
+    box-sizing: border-box;
+    background-color: rgb(229, 229, 229) !important;
+    font-family: "nunito";
+}
+
+a {
+    font-family: "nunito";
+}
+
+#end_date {
+    width: 140px !important;
+    font-size: 17px !important;
+}
+
+#start_date {
+    width: 140px !important;
+    font-size: 17px !important;
+}
+
+#btn_R {
+    margin-right: 10px !important;
+}
+
+#title-top {
+    margin: auto !important;
+}
+
+.VirtualizedSelectOption {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* .modebar-container {
+    visibility: hidden !important;
+} */
+
+#detail_XE_MAUXE,
+#detail_Xe_DG_TG,
+#detail_MauXe_DG,
+#detail_KhoXe,
+#detail_XUAT_KHO,
+#detail_nhap,
+#detail_LOAI_XE,
+#detail_MAU_XE,
+#detail_DONG_XE_DG,
+#detail_MAUXE_DG,
+#detail_XEDG {
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+
+/* Style new 10/12/2020 */
+.ov {
+    height: 12vh;
+    width: 100%;
+    color: #fff;
+}
+
+.ov .content-ov {
+    width: 100%;
+    height: 100%;
+    text-transform: uppercase;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov .content-ov .value {
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.title_below {
+    text-transform: uppercase;
+    font-size: 1.5vh;
+    font-weight: 700;
+}
+
+.ov .icon-ov {
+    width: 100%;
+    height: 100%;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov .icon-ov img {
+    max-width: 90%;
+    max-height: 90%;
+    height: auto;
+    margin: auto;
+}
+
+.ele_row {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.graph_kx {
+    height: 40vh;
+}
+
+/* ------------------------------------------------------------------------------------- */
+/* NEW 25/01/2021 */
+
+@media only screen and (max-width: 1024px) {
+    .ov {
+        height: 85px;
+        width: 100%;
+        color: #fff;
+    }
+    .title_below {
+        font-size: 20px;
+        font-weight: 700;
+    }
+    .ov .content-ov {
+        width: 100%;
+        height: 100%;
+        text-transform: uppercase;
+        display: inline-grid;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .ov .content-ov .value {
+        font-size: 27px;
+        font-weight: 700;
+    }
+
+    .header-desktop {
+        position: relative;
+        top: 0;
+        left: 0;
+        height: 110px;
+    }
+
+    .main-content {
+        padding-top: 50px;
+        padding-bottom: 20px;
+    }
+
+    .graph_kx {
+        height: 300px;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    .title_below {
+        font-size: 18px;
+        font-weight: 700;
+    }
+    .ov .content-ov {
+        width: 100%;
+        height: 100%;
+        text-transform: uppercase;
+        display: inline-grid;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .ov .content-ov .value {
+        font-size: 25px;
+        font-weight: 700;
+    }
+
+    .menu-bar-mobel {
+        position: absolute;
+        right: 30px;
+        top: -30px;
+    }
+
+    .btn-lg-mobel {
+        justify-content: end;
+        margin-right: 30px;
+    }
+
+    .graph_kx {
+        height: 300px;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    /*2222*/
+
+    .title_below {
+        font-size: 17px;
+        font-weight: 700;
+    }
+    .ov .content-ov {
+        width: 100%;
+        height: 100%;
+        text-transform: uppercase;
+        display: inline-grid;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .ov .content-ov .value {
+        font-size: 23px;
+        font-weight: 700;
+    }
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Thor Thor */
+.graph_kt {
+    height: 40vh;
+}
+
+.ov-kt {
+    height: 10vh;
+    width: 100%;
+    color: #fff;
+}
+
+.ov-kt .content-ov-kt {
+    width: 100%;
+    height: 100%;
+    text-transform: uppercase;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov-kt .content-ov-kt .value {
+    font-size: 1.1vw;
+    font-weight: 700;
+}
+
+.title_below_kt {
+    text-transform: uppercase;
+    font-size: 0.75vw;
+    font-weight: 700;
+}
+
+#detail_ChiPhiBH,
+#detail_ChiPhi,
+#detail_ChiPhiDV {
+    width: 100%;
+    height: 100%;
+}
+
+@media only screen and (max-width: 1280px) {
+    .ov-5 {
+        width: 19.5%;
+        color: #fff;
+        justify-content: space-between;
+    }
+
+    .ov-kt {
+        height: 85px;
+        width: 100%;
+        color: #fff;
+    }
+
+    .ov-kt .content-ov-kt .value {
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    .title_below_kt {
+        text-transform: uppercase;
+        font-size: 12px;
+        font-weight: 700;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    .graph_kt {
+        height: 300px;
+    }
+
+    .ov-kt .content-ov-kt .value {
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    .title_below_kt {
+        text-transform: uppercase;
+        font-size: 15px;
+        font-weight: 700;
+    }
+}
+
+/* ---------------------------------------------------------------------------------------------- */
+/* TaiNPA */
+.ov_khovt {
+    height: 18vh;
+}
+
+.graph_kvt {
+    height: 40vh;
+}
+
+#DT_DETAIL_TONKHO_6T_CH {
+    height: 100%;
+}
+
+#DT_DETAIL_TONKHO_6T_TONG_CTY,
+#DT_DETAIL_CHITIET_XK_SI {
+    height: 100%;
+}
+
+.card_overview {
+    display: inline-grid;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    min-height: 100% !important;
+}
+
+.label_overview {
+    font-size: 1.15vw;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.count_overview {
+    font-size: 1.7vw;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+@media only screen and (max-width: 1024px) {
+    .graph_kvt {
+        height: 300px;
+    }
+
+    .ov_khovt {
+        height: 120px;
+        width: 100%;
+    }
+
+    .label_overview {
+        font-size: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .count_overview {
+        font-size: 30px;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-align: center;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    .graph_kvt {
+        height: 300px;
+    }
+
+    .ov_khovt {
+        height: 120px;
+        width: 100%;
+    }
+
+    .label_overview {
+        font-size: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .count_overview {
+        font-size: 30px;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-align: center;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    /*2222*/
+
+    .graph_kvt {
+        height: 300px;
+    }
+
+    .ov_khovt {
+        height: 100px;
+        width: 100%;
+    }
+
+    .label_overview {
+        font-size: 17px;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .count_overview {
+        font-size: 25px;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-align: center;
+    }
+}
+
+/* --------------------------------------------------------------------------------------- */
+/* BÁN HÀNG CHỊ VÂN */
+
+.ov-bh {
+    height: 17vh;
+    width: 100%;
+    color: #fff;
+    margin-right: 0;
+}
+
+.ov-bh .content-ov-bh {
+    width: 100%;
+    height: 100%;
+    text-transform: uppercase;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov-bh .content-ov-bh .value {
+    font-size: 3.5vh;
+    font-weight: 700;
+}
+
+.title_below_bh {
+    text-transform: uppercase;
+    font-size: 3vh;
+    font-weight: 700;
+}
+
+.ele_row {
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+.graph_bh {
+    height: 40vh;
+    margin-right: 0;
+}
+
+.btn_in_title {
+    margin-bottom: 0;
+}
+
+#DETAIL_NVBH,
+#DETAIL_PHUONG,
+#DETAIL_QUAN,
+#DETAIL_MAUXE,
+#DETAIL_DONGXE,
+#DETAILTON_DVCS,
+#DETAILTON_DONGXE,
+#DETAILTON_MAUXE,
+#DETAILGIA_DONGXE,
+#DETAILGIA_LOAIXE {
+    width: 100%;
+    height: 100%;
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* NEW STYLE 27/01/2021 */
+@media only screen and (max-width: 1024px) {
+    .ov-bh {
+        height: 100px;
+        width: 100%;
+        color: #fff;
+        margin-right: 0;
+    }
+
+    .title_below_bh {
+        font-size: 22px;
+        font-weight: 700;
+    }
+
+    .ov-bh .content-ov-bh .value {
+        font-size: 27px;
+        font-weight: 700;
+    }
+
+    .header-desktop {
+        position: relative;
+        top: 0;
+        left: 0;
+        height: 110px;
+    }
+
+    .main-content {
+        padding-top: 50px;
+        padding-bottom: 20px;
+    }
+
+    .graph_bh {
+        height: 300px;
+        margin-right: 0;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    .title_below_bh {
+        font-size: 19px;
+        font-weight: 700;
+    }
+
+    .ov-bh .content-ov-bh .value {
+        font-size: 31px;
+        font-weight: 700;
+    }
+
+    .menu-bar-mobel {
+        position: absolute;
+        right: 30px;
+        top: -30px;
+    }
+
+    .btn-lg-mobel {
+        justify-content: end;
+        margin-right: 30px;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    /*2222*/
+
+    .title_below_bh {
+        font-size: 17px;
+        font-weight: 700;
+    }
+
+    .ov-bh .content-ov-bh .value {
+        font-size: 23px;
+        font-weight: 700;
+    }
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* C Vân */
+.graph-kpi {
+    height: 40vh;
+}
+
+/* ------------------------------------------------------------------------------------- */
+/* NEW 25/01/2021 */
+
+@media only screen and (max-width: 1024px) {
+    .graph-kpi {
+        height: 300px;
+    }
+
+    .header-desktop {
+        position: relative;
+        top: 0;
+        left: 0;
+        height: 110px;
+    }
+
+    .main-content {
+        padding-top: 50px;
+        padding-bottom: 20px;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    .menu-bar-mobel {
+        position: absolute;
+        right: 30px;
+        top: -30px;
+    }
+
+    .btn-lg-mobel {
+        justify-content: end;
+        margin-right: 30px;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    /*2222*/
+}
+
+/* ANH TỔNG */
+.ov-dv {
+    height: 100%;
+    width: 100%;
+    color: #fff;
+}
+
+.ov-dv .content-ov-dv {
+    width: 100%;
+    height: 100%;
+    text-transform: uppercase;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.title_above {
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.ov-dv .content-ov-dv .value {
+    font-size: 2.7vh;
+    font-weight: 700;
+}
+
+.title_below {
+    text-transform: uppercase;
+    font-size: 2vh;
+    font-weight: 700;
+}
+
+.ov-dv .icon-ov-dv {
+    width: 100%;
+    height: 100%;
+    display: inline-grid;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.ov-dv .icon-ov-dv img {
+    max-width: 90%;
+    max-height: 90%;
+    height: 90%;
+}
+
+.ele_row {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+#table_DT_THO,
+#table_PTNGOAI,
+#table_DT_KH {
+    width: 100%;
+    height: 100%;
+}
+
+.graph_dv {
+    height: 40vh;
+}
+
+/* ------------------------------------------------------------------------------------- */
+/* NEW 05/03/2021 */
+
+@media only screen and (max-width: 1024px) {
+    .ov-dv {
+        height: 85px;
+        width: 100%;
+        color: #fff;
+    }
+    .title_below {
+        font-size: 17px;
+        font-weight: 700;
+    }
+    .ov-dv .content-ov-dv {
+        width: 100%;
+        height: 100%;
+        text-transform: uppercase;
+        display: inline-grid;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .ov-dv .content-ov-dv .value {
+        font-size: 25px;
+        font-weight: 700;
+    }
+
+    .header-desktop {
+        position: relative;
+        top: 0;
+        left: 0;
+        height: 110px;
+    }
+
+    .main-content {
+        padding-top: 50px;
+        padding-bottom: 20px;
+    }
+
+    .graph_dv {
+        height: 300px;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    .title_below {
+        font-size: 18px;
+        font-weight: 700;
+    }
+    .ov-dv .content-ov-dv {
+        width: 100%;
+        height: 100%;
+        text-transform: uppercase;
+        display: inline-grid;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .ov-dv .content-ov-dv .value {
+        font-size: 25px;
+        font-weight: 700;
+    }
+
+    .menu-bar-mobel {
+        position: absolute;
+        right: 30px;
+        top: -30px;
+    }
+
+    .btn-lg-mobel {
+        justify-content: end;
+        margin-right: 30px;
+    }
+
+    .graph_dv {
+        height: 300px;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    /*2222*/
+
+    .title_below {
+        font-size: 17px;
+        font-weight: 700;
+    }
+    .ov-dv .content-ov-dv {
+        width: 100%;
+        height: 100%;
+        text-transform: uppercase;
+        display: inline-grid;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .ov-dv .content-ov-dv .value {
+        font-size: 23px;
+        font-weight: 700;
+    }
+}

@@ -1,0 +1,31 @@
+{% import 'admin/static.html' as admin_static with context%}
+{% import 'libs_org/lib.html' as lib with context %}
+
+{% block body %}
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    {% set header_name = 'TẠO TÀI KHOẢN' if admin_view.name == 'Users' else 'TẠO QUYỀN' %}
+    <h3>{{ header_name }}</h3>
+  </div>
+  <div class="modal-body">
+    {# "save and add" button is removed from modal (it won't function properly) #}
+    {% block create_form %}
+      {{ lib.render_form(form, return_url, extra=None, form_opts=form_opts,
+                         action=url_for('.create_view', url=return_url),
+                         is_modal=True) }}
+    {% endblock %}
+  </div>
+{% endblock %}
+
+{% block tail %}
+  <script src="{{url_for('static', filename='js/message_error.js')}}"></script>
+  <script src="{{url_for('protected', filename='js/checking.js')}}"></script>
+  <script>
+    $(document).ready(function() {
+        var btn_save = $(".btn-primary");
+        btn_save.attr("type", "button");
+        btn_save.attr("onclick", "chk_info('C');");
+    });
+  </script>
+  <script src="{{ admin_static.url(filename='admin/js/bs3_modal.js', v='1.0.0') }}"></script>
+{% endblock %}

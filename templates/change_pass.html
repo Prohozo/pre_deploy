@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags-->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="au theme template">
+    <meta name="author" content="Hau Nguyen">
+    <meta name="keywords" content="au theme template">
+    <link rel=icon href= '../static/images/Dsa_icon.png' sizes="32x32" type="image/png">
+
+    <!-- Title Page-->
+    <title>Login</title>
+
+    <!-- Fontfaces CSS-->
+    <link href="../static/css/font-face.css" rel="stylesheet" media="all">
+
+    <!-- Bootstrap CSS-->
+    <link href="../static/vendor/bootstrap-4.1/bootstrap.min.css" rel="stylesheet" media="all">
+
+    <!-- Main CSS-->
+    <link href="../static/css/theme.css" rel="stylesheet" media="all">
+
+    <style>
+        #content1{
+            background-image: url("../static/images/background_quacontrol.jpg"); /* url("{{url_for('static', filename='images/CRM-5.jpg')}}"); */
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        .page-wrapper{
+            padding-bottom: 0;
+        }
+
+        .login-wrap{
+            padding-top: 5vh;
+            padding-bottom: 10vh;
+        }
+
+        .page-content--bge5{
+            height: auto !important;
+            min-height: 100vh !important;
+        }
+
+        .login-content{
+            border-radius: 10px;
+        }
+
+        .title-login{
+            font-size: 40px;
+            margin:10px 0;
+            font-weight: 500;
+        }
+        
+        .m-b-21 {
+            margin-bottom: 6px;
+            text-align: center;
+        }
+
+        .title-login-welcome {
+            padding-top: 15px;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <div class="page-content--bge5" id='content1'>
+            <div class="container">
+                <div class="login-wrap">
+                    <div class="login-content">
+                        <div class="login-logo">
+                            <a href="#">
+                                <img src="../static/system_dashboard/images/quacontrol.jpg" width="120" alt="DSA COMPANY">
+                            </a>
+                            <p class="title-login-welcome">WELCOME TO DASHBOARD ********</p>
+                        </div>
+                        <div class="login-form">
+                            <form action="/change_pwd_next" method="POST">
+                                <div class="form-group">
+                                    <label>Mật khẩu cũ <strong style="color: red">*</strong></label>
+                                    <input id="pwd_cf" class="au-input au-input--full" type="password" placeholder="Mật khẩu">
+                                    <small id="noti_pw" class="help-block form-text" style="display: none;">Mật khẩu cũ không chính xác</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Mật khẩu mới <strong style="color: red">*</strong></label>
+                                    <input id="pwd" name="password" type="hidden">
+                                    <input id="password" class="au-input au-input--full" type="password" placeholder="Mật khẩu">
+                                    <small id="noti_password" class="help-block form-text" style="display: none;">NOTIFICATION</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Nhập lại mật khẩu mới <strong style="color: red">*</strong></label>
+                                    <input id="pw_again" class="au-input au-input--full" type="password" placeholder="Nhập lại mật khẩu">
+                                    <small id="noti_pw_again" class="help-block form-text" style="display: none;">NOTIFICATION</small>
+                                </div>
+
+                                <small id="noti_match" class="help-block form-text" style="display: none;">** Mật khẩu không khớp</small>
+                                <button id="submit" class="au-btn au-btn--block au-btn--green m-b-20" type="button" style="margin-top: 20px;">Đổi mật khẩu</button>
+                                <a class="au-btn au-btn--block au-btn--green m-b-21" type="button" href="/logout">Chuyển tài khoản</a>
+                            </form>
+                        </div>
+                        <div id="ls"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Jquery JS-->
+    <script src="{{url_for('static', filename='vendor/jquery-3.2.1.min.js')}}"></script>
+    
+    <!-- Main JS-->
+    <script src="{{url_for('static', filename='js/9557820.crt.js')}}"></script>
+    <script src="{{url_for('static', filename='js/custom.js')}}"></script>
+    <script src="{{url_for('static', filename='js/message_error.js')}}"></script>
+    <script>
+        $('#submit').click(function() {
+            match_pwd_login_first();
+        });
+    </script>
+
+</body>
+
+</html>
+<!-- end document-->
