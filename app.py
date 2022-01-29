@@ -34,12 +34,12 @@ db = SQLAlchemy(server)
 #     suppress_callback_exceptions=True
 # )
 
-app_Accounts = Dash(
-    __name__,
-    server=server,
-    url_base_pathname='/Accounts/',
-    suppress_callback_exceptions=True
-)
+# app_Accounts = Dash(
+#     __name__,
+#     server=server,
+#     url_base_pathname='/Accounts/',
+#     suppress_callback_exceptions=True
+# )
 app_Lead = Dash(
     __name__,
     server=server,

@@ -8,7 +8,7 @@ from admin import security
 # from Users import app_User
 # from Project import app_DuAn
 from lead import app_Lead
-from Accounts import app_Accounts
+# from Accounts import app_Accounts
 from potential import app_Potential
 # from Users_CRM import app_UsersCRM
 from Support import app_Support
@@ -23,7 +23,7 @@ from models import Users
 from app import db
 import os
 from functools import wraps
-from controller.hipa import hapa, enpa
+# from controller.hipa import hapa, enpa
 
 
 @server.route("/")
@@ -64,11 +64,11 @@ def reset_pwd():
     else:
         uid = request.get_json()['id']
         pwd = get_random_string(8)
-        ha_pwd = hapa(pwd)
+        ha_pwd = pwd
         user = Users.query.filter_by(id=uid)
         user.update(dict(password=utils.encrypt_password(ha_pwd), change_pwd=1))
         db.session.commit()
-        return enpa(pwd)
+        return pwd
 
 # Confirm password of current user
 
@@ -128,4 +128,4 @@ def protected(filename):
 
 if __name__ == '__main__':
     ''' Change ip (host) server and port: '''
-    server.run(debug=True, use_reloader=True)
+    server.run(debug=True, use_reloader=True,port=5000)
