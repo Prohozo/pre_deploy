@@ -1,8 +1,8 @@
 -- --------------------------------------------------------
--- Host:                         192.168.1.123
--- Server version:               10.4.18-MariaDB - mariadb.org binary distribution
--- Server OS:                    Win64
--- HeidiSQL Version:             11.2.0.6213
+-- Host:                         localhost
+-- Server version:               8.0.27-0ubuntu0.20.04.1 - (Ubuntu)
+-- Server OS:                    Linux
+-- HeidiSQL Version:             11.3.0.6295
 -- --------------------------------------------------------
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
@@ -13,1647 +13,6022 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 
+-- Dumping database structure for crm
+CREATE DATABASE IF NOT EXISTS `crm` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `crm`;
 
-
--- Dumping structure for procedure dsapms.dsa_sp_action_multiline
+-- Dumping structure for procedure crm.dsa_account
 DELIMITER //
-CREATE PROCEDURE `dsa_sp_action_multiline`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(200),
-	IN `start_date_` DATE,
-	IN `end_date_` DATE,
-	IN `time_type` CHAR(1)
-)
-BEGIN
-	DECLARE query_ nvarchar(2000);
-	DECLARE date_ nvarchar(2000);
-	DECLARE time_group nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	
-	IF (time_type = 'D') THEN
-		SET date_ = 'CAST(a.date AS DATE)';
-	ELSEIF (time_type = 'M') THEN
-		SET date_ = CONCAT('CONCAT(CAST(YEAR(a.date) AS NCHAR), ''-'', CASE WHEN MONTH(a.date) < 10 THEN CONCAT( ''0'',CAST(MONTH(a.date) AS NCHAR)) ELSE CAST(MONTH(a.date) AS NCHAR) END,''-01'')');
-	ELSE
-		SET date_ = 'CAST(YEAR(a.date) AS NCHAR)';
-	END IF;
-	
-	
-	SET query_ = CONCAT('SELECT COUNT(a.action) sl_action, a.action, ', date_,' FROM zt_action a',
-								' LEFT JOIN zt_project b ON a.project = b.id', 		
-								' LEFT JOIN zt_user d ON a.actor = d.account',
-								' LEFT JOIN zt_dept e ON d.dept = e.id',
-								' WHERE a.objectType = ''project''  AND b.deleted = ''0'' ',
-								' AND (a.action IN (''started'', ''opened'', ''suspended'', ''closed''))');
-						
-		/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND a.project = ''', name_, '''');
-   END IF;
-   /* Lọc theo bộ phận */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND e.id = ''', dept_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND b.name = ''', values_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ cột*/
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND e.name = ''', values_, '''');
-	END IF;
-	/* Lọc theo thời gian*/
-	IF (start_date_ IS NOT NULL AND end_date_ IS NOT NULL) Then
-			SET query_ = CONCAT(query_, ' AND a.date BETWEEN ''', CAST(start_date_ AS NCHAR),''' And ''' , CAST(end_date_ AS NCHAR), '''');
-	END IF;
-	
-	
-	IF (time_type = 'D') THEN
-		SET time_group = 'YEAR(a.date), MONTH(a.date), DATE(a.date)';
-	ELSEIF (time_type = 'M') THEN
-		SET time_group = 'YEAR(a.date), MONTH(a.date)';
-	ELSE
-		SET time_group = 'YEAR(a.date)';
-	END IF;
-	If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND b.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND b.status = ''doing'' AND CURDATE() > b.end'
-								  WHEN values_ = 'doing' THEN ' AND b.status = ''doing'' AND CURDATE() <= b.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND b.status = ''closed'' AND b.end < CAST(b.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND b.status = ''closed'' AND b.end = CAST(b.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND b.status = ''closed'' AND b.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND b.status = ''closed'' AND b.end > CAST(b.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;	
-	
-	SET query_ = CONCAT(query_ ,' GROUP BY ', time_group, ', a.action');
-
-
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_action_tron
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_action_tron`(
-	IN `name_` NVARCHAR(200),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	SET query_ = CONCAT('SELECT b.action, COUNT(distinct(b.id)) Soluot',
-								 ' FROM zt_project a',
-								 ' JOIN zt_action b ON a.id = b.project WHERE b.objectType = ''project'' AND a.deleted = ''0''');
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND a.name = ', name_);
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name_') Then
-   	SET query_ = CONCAT(query_, ' AND a.name = ''', values_, '''');
-   END IF;
-	SET query_ = CONCAT(query_ ,' GROUP BY b.action');
-	
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_ddl_dept
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_ddl_dept`(
-	IN `type_` nvarchar(20)
-)
-    DETERMINISTIC
-BEGIN
-	DECLARE query_ nvarchar(2000);
-	
-	IF (type_ = 'ddl_dept') Then
-		SET query_ = CONCAT('SELECT id, name FROM zt_dept');
-		
-	END IF;
-						
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_ddl_project
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_ddl_project`(
-	IN `type_` nvarchar(20)
-)
-    DETERMINISTIC
-BEGIN
-	DECLARE query_ nvarchar(2000);
-	
-	IF (type_ = 'ddl_name') Then
-		SET query_ = CONCAT('SELECT id, name FROM zt_project WHERE deleted = ''0''');
-		ELSEIF (type_ = 'ddl_action') Then
-			SET query_ = CONCAT('SELECT DISTINCT(action) FROM zt_action where objectType = ''project''');
-	END IF;
-						
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_detail_DuAn_Bang
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_detail_DuAn_Bang`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('a.action = ''', values_, '''') ELSE 'a.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	SET query_ = CONCAT('SELECT c.name, DATEDIFF( CURDATE(), MAX(a.date)) tt_date',
-	  							 ', CASE WHEN b.story_num IS NULL THEN 0 ELSE b.story_num END story_num', 
-								 ', CASE WHEN c.status = ''suspended'' then c.status',
-				   			 ' WHEN c.status = ''wait'' then c.status', 
-				  				 ' WHEN c.status = ''doing'' AND CURDATE() > c.end then ''doing (delay)''',
-				 			    ' WHEN c.status = ''doing'' AND CURDATE() <= c.end then c.status' ,		 			    
-				  				 ' ELSE ''closed'' END AS LoaiHinh',  							 
-								 ' FROM zt_action a',
-								 ' LEFT JOIN (SELECT project, COUNT(project) story_num FROM zt_projectstory GROUP BY project) b ON a.project = b.project', 
-								 ' LEFT JOIN zt_project c ON a.project = c.id ',
-								 ' LEFT JOIN zt_user d ON a.actor = d.account',
-								 ' LEFT JOIN zt_dept e ON d.dept = e.id',
-								 ' WHERE c.id IN (SELECT DISTINCT(project) FROM zt_action a WHERE objectType = ''project'' AND ', query_action, ') 
-								   AND c.status <>''closed'' AND c.name IS NOT NULL AND c.deleted = ''0''');
-						
-
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', name_,'''');
-   END IF;
-   	/* Lọc theo dept */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND e.id = ''', dept_,'''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_ ,' AND c.name = ''', values_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_ ,' AND e.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND c.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND c.status = ''doing'' AND CURDATE() > c.end'
-								  WHEN values_ = 'doing' THEN ' AND c.status = ''doing'' AND CURDATE() <= c.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND c.status = ''closed'' AND c.end < CAST(c.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND c.status = ''closed'' AND c.end = CAST(c.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND c.status = ''closed'' AND c.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND c.status = ''closed'' AND c.end > CAST(c.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;
-	SET query_ = CONCAT(query_ ,' GROUP BY c.name, CASE WHEN b.story_num IS NULL THEN 0 ELSE b.story_num END');
-
-
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_overview_DuAn
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_overview_DuAn`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	
-	SET query_ = CONCAT(' SELECT  COUNT(DISTINCT d.id) SoDA
- 								FROM zt_project d LEFT JOIN zt_task a ON d.id = a.project
-								LEFT JOIN zt_user b ON a.finishedBy = b.account 
-								LEFT JOIN zt_dept c ON b.dept = c.id
-								WHERE d.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND d.deleted = ''0''');
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-	/*Lọc theo action*/
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_,'''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-  
-	If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > d.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;		
-							
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_overview_DuAn_doing
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_overview_DuAn_doing`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	SET query_ = CONCAT(' SELECT COUNT(DISTINCT d.id) SoDA
- 								FROM zt_project d LEFT JOIN zt_task a ON d.id = a.project
-								LEFT JOIN zt_user b ON a.finishedBy = b.account 
-								LEFT JOIN zt_dept c ON b.dept = c.id
-								WHERE d.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND d.status = ''doing''AND d.deleted = ''0''');
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-	/*Lọc theo dept*/
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_,'''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-	If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > d.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;		
-								
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_overview_DuAn_suspended
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_overview_DuAn_suspended`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	SET query_ = CONCAT(' SELECT COUNT(DISTINCT d.id) SoDA
- 								FROM zt_project d LEFT JOIN zt_task a ON d.id = a.project
-								LEFT JOIN zt_user b ON a.finishedBy = b.account 
-								LEFT JOIN zt_dept c ON b.dept = c.id
-								WHERE d.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND d.status = ''suspended''AND d.deleted = ''0''');
-								
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-	/*Lọc theo dept*/
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_,'''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-	If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > d.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;		
-							
-							
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_overview_DuAn_wait
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_overview_DuAn_wait`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	SET query_ = CONCAT(' SELECT COUNT(DISTINCT d.id) SoDA
- 								FROM zt_project d LEFT JOIN zt_task a ON d.id = a.project
-								LEFT JOIN zt_user b ON a.finishedBy = b.account 
-								LEFT JOIN zt_dept c ON b.dept = c.id
-								WHERE d.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND d.status = ''wait''AND d.deleted = ''0''');
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-	/*Lọc theo dept*/
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_,'''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-	If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > d.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;		
-							
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_SoDuAn_dept
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_SoDuAn_dept`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(200)
-)
-BEGIN
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	SET query_ = CONCAT(' SELECT c.name, COUNT(DISTINCT a.project) SoDA
-								FROM zt_task a LEFT JOIN zt_user b ON a.finishedBy = b.account 
-								LEFT JOIN zt_dept c ON b.dept = c.id
-								LEFT JOIN zt_project d ON a.project = d.id 
-								WHERE a.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND a.deleted = ''0'' AND b.deleted = ''0''');
-								
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-   /* Lọc theo bộ phận */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ cột*/
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > a.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;
-	SET query_ = CONCAT(query_ ,' GROUP BY c.name  ORDER BY COUNT(DISTINCT a.project) DESC');
-	
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_status_DuAn_tron
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_status_DuAn_tron`(
-	IN `name_` nvarchar(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	
-	SET query_ = CONCAT('SELECT CASE WHEN a.status = ''suspended'' then a.status', 
-	 			   			' WHEN a.status = ''wait'' then a.status',
-	 			  				' WHEN a.status = ''doing'' AND CURDATE() > a.end then ''doing (delay)''',
-				 			   ' WHEN a.status = ''doing'' AND CURDATE() <= a.end then a.status' ,
-				 			   ' WHEN a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE) then ''closed (delay)''' ,
-				 			   ' WHEN a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE) then ''closed (on-TIME)''' ,
-				 			   ' WHEN a.status = ''closed'' AND a.closedDate = ''0000-00-00 00:00:00'' then a.status',
-	 			  				' ELSE ''finish-soon'' END  LoaiHinh',
-								', count(distinct(a.id)) tong', 
-								' from zt_project a', 
-								' LEFT JOIN zt_task b ON a.id = b.project',
-								' LEFT JOIN zt_user c ON b.finishedBy = c.account' ,
-								' LEFT JOIN zt_dept d ON c.dept = d.id',								
-								' WHERE a.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND a.deleted = ''0''');
-
-
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND a.id = ''', name_, '''');
-   END IF;
-   /* Lọc theo dept */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', dept_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_ ,' AND a.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_ ,' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND a.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND a.status = ''doing'' AND CURDATE() > a.end'
-								  WHEN values_ = 'doing' THEN ' AND a.status = ''doing'' AND CURDATE() <= a.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND a.status = ''closed'' AND a.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND a.status = ''closed'' AND a.end > CAST(a.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;		
-        
-	SET query_ = CONCAT(query_ , ' GROUP BY CASE ',
-													 	' WHEN a.status = ''suspended'' then a.status' ,
-													 	' WHEN a.status = ''wait'' then a.status' ,
-													 	' WHEN a.status = ''doing'' AND CURDATE() > a.end then ''doing (delay)''',
-													 	' WHEN a.status = ''doing'' AND CURDATE() <= a.end then a.status',
-														' WHEN a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE) then ''closed (delay)''',
-													 	' WHEN a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE) then ''closed (on-time)''', 
-													 	' WHEN a.status = ''closed'' AND a.closedDate = ''0000-00-00 00:00:00'' then a.status',
-													 	' ELSE ''finish-soon'' END');
-	/*PRINT(query_)*/
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_status_MucdoTT_DuAn_BANG
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_status_MucdoTT_DuAn_BANG`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	SET query_ = CONCAT('SELECT a.name, DATEDIFF( CURDATE(), MAX(b.date)) tt_date, CASE WHEN a.status = ''suspended'' then a.status',
-				   			 ' WHEN a.status = ''Wait'' then a.status', 
-				  				 ' WHEN a.status = ''doing'' AND CURDATE() > a.end then ''doing (delay)''',
-				 			    ' WHEN a.status = ''doing'' AND CURDATE() <= a.end then a.status' ,		 			    
-				  				 ' ELSE ''closed'' END AS LoaiHinh',
-								 ' FROM zt_project a',
-								 ' LEFT JOIN zt_action b ON a.id = b.project',						
-								 ' WHERE a.status <>''closed'' AND a.deleted = ''0''');
-						 
-								 
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND a.id = ''', name_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_ ,' AND a.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND a.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND a.status = ''doing'' AND CURDATE() > a.end'
-								  WHEN values_ = 'doing' THEN ' AND a.status = ''doing'' AND CURDATE() <= a.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND a.status = ''closed'' AND a.end < a.closedDate'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND a.status = ''closed'' AND a.end = a.closedDate'
-								  ELSE ' AND a.status = ''closed'' AND a.end > a.closedDate' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;	
-	SET query_ = CONCAT(query_ ,' GROUP BY CASE'
-	 							 ' WHEN a.status = ''wait'' then a.status',
-	 			  				 ' WHEN a.status = ''doing'' AND CURDATE() > a.end then ''doing (delay)''',
-				 			    ' WHEN a.status = ''doing'' AND CURDATE() <= a.end then a.status' ,
-				 			    ' ELSE ''closed'' END, a.name', 
-								 ' ORDER BY tt_date DESC' );
-
-
- 	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_ThongKe_DuAn_BANG
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_ThongKe_DuAn_BANG`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(100)
-)
-BEGIN
-
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
- 	SET query_ = CONCAT('SELECT a.NAME, CASE WHEN a.status = ''suspended'' then a.status', 
-		   			' WHEN a.status = ''wait'' then a.status' ,
-		  				' WHEN a.status = ''doing'' AND CURDATE() > a.end then ''doing (delay)''',
-		 			   ' WHEN a.status = ''doing'' AND CURDATE() <= a.end then a.status' ,
-		 			   ' WHEN a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE) then ''closed (delay)''', 
-		 			   ' WHEN a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE) then ''closed (on-TIME)''',
-		 			   ' WHEN a.status = ''closed'' AND a.closedDate = ''0000-00-00 00:00:00'' then a.status',
-		  				' ELSE ''finish-soon'' END AS LoaiHinh',
-	 	 		 ', CASE WHEN a.status = ''doing'' AND CURDATE() > a.end Then DATEDIFF(a.end, CURDATE())',
-	 	 		 		' WHEN a.status = ''doing'' AND CURDATE() <= a.end Then DATEDIFF( a.end, CURDATE())' ,
-						' WHEN a.status = ''closed'' AND a.end > CAST(a.closedDate AS DATE) Then DATEDIFF( a.end, a.closedDate)',
-						' WHEN a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE)Then DATEDIFF( a.end, a.closedDate)',
-						' WHEN a.status = ''wait'' Then DATEDIFF(CURDATE(), a.begin)',
-						' WHEN a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE)Then DATEDIFF( a.end, a.closedDate)',
-					 	' ELSE ''Null'' END AS SoNgay' ,
-				', COUNT(distinct(assignedTo)) AS Nguoi',
-				', COUNT(b.id) AS TASK' ,		 		
-				' from zt_project a', 
-				' LEFT JOIN zt_task b ON a.id = b.project',
-				' LEFT JOIN zt_user c ON b.finishedBy = c.account' ,
-				' LEFT JOIN zt_dept d ON c.dept = d.id',								
-				' WHERE a.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND a.deleted = ''0''');
-		/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND a.id = ''', name_, '''');
-   END IF;
-   	/* Lọc theo dept */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', dept_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_ ,' AND a.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_ ,' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND a.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND a.status = ''doing'' AND CURDATE() > a.end'
-								  WHEN values_ = 'doing' THEN ' AND a.status = ''doing'' AND CURDATE() <= a.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND a.status = ''closed'' AND a.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND a.status = ''closed'' AND a.end > CAST(a.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;	
-	SET query_ = CONCAT(query_ , ' GROUP BY  CASE WHEN a.status = ''suspended'' then a.status' ,
-													 	' WHEN a.status = ''wait'' then a.status' ,
-													 	' WHEN a.status = ''doing'' AND CURDATE() > a.end then ''doing (delay)''',
-													 	' WHEN a.status = ''doing'' AND CURDATE() <= a.end then a.status',
-														' WHEN a.status = ''closed'' AND a.end < CAST(a.closedDate AS DATE) then ''closed (delay)''',
-													 	' WHEN a.status = ''closed'' AND a.end = CAST(a.closedDate AS DATE) then ''closed (on-time)''', 
-													 	' WHEN a.status = ''closed'' AND a.closedDate = ''0000-00-00 00:00:00'' then a.status',
-													 	' ELSE ''finish-soon'' END, a.id ');
-														
-														
-
-								
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_Tiendo_duan
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_Tiendo_duan`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(200),
-	IN `values_` NVARCHAR(200)
-)
-BEGIN 
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	SET query_ = CONCAT(' SELECT d.name, SUM(a.left) AS left_, SUM(a.consumed) COST, 
-		 						 CONCAT(CAST(CAST(SUM(a.consumed) /( SUM(a.consumed)+SUM(a.left))*100 AS DECIMAL(10,2)) AS NCHAR), ''%'') txt_tile_ht',
-						' FROM zt_project d LEFT JOIN zt_task a ON d.id = a.project',
-						' LEFT JOIN zt_user b ON a.finishedBy = b.account',  
-						' LEFT JOIN zt_dept c ON b.dept = c.id',
-						' WHERE d.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND a.deleted = ''0'' AND d.deleted = ''0'' AND a.parent <> ''-1''');
-
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-   /* Lọc theo bộ phận */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ cột*/
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > a.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;						
-	SET query_ = CONCAT(query_ ,' GROUP BY d.name ORDER BY CONCAT(CAST(CAST(SUM(a.consumed) /( SUM(a.consumed)+SUM(a.left))*100 AS DECIMAL(10,2)) AS NCHAR), ''%'') DESC');
-	
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-				
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_sp_TL_DuAn_dept
-DELIMITER //
-CREATE PROCEDURE `dsa_sp_TL_DuAn_dept`(
-	IN `name_` NVARCHAR(200),
-	IN `dept_` NVARCHAR(20),
-	IN `col_` NVARCHAR(20),
-	IN `values_` NVARCHAR(200)
-)
-BEGIN
-	DECLARE query_ nvarchar(2000);
-	DECLARE query_lh nvarchar(200);
-	DECLARE query_action nvarchar(300);
-	
-	   SET query_action = CASE WHEN col_ = 'action' THEN CONCAT('e.action = ''', values_, '''') ELSE 'e.action IN ( ''opened'', ''closed'', ''started'' , ''suspended'')' END;
-	
-		SET query_ = CONCAT(' SELECT c.name, COUNT(DISTINCT a.project)/(SELECT COUNT(*) FROM zt_project WHERE deleted = ''0'') * 100 AS TiLe,
-									CONCAT(CAST(CAST(COUNT(DISTINCT a.project)/(SELECT COUNT(*) FROM zt_project WHERE deleted = ''0'') * 100 AS DECIMAL(10,2)) AS NCHAR), ''%'') text_tile
-									FROM zt_task a LEFT JOIN zt_user b ON a.finishedBy = b.account 
-									LEFT JOIN zt_dept c ON b.dept = c.id
-									LEFT JOIN zt_project d ON a.project = d.id 
-									WHERE d.id IN (SELECT DISTINCT(project) FROM zt_action e WHERE objectType = ''project'' AND ', query_action, ') AND d.deleted = ''0''  AND b.deleted = ''0''');
-								
-	/* Lọc theo dự án */
-	IF (name_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND d.id = ''', name_, '''');
-   END IF;
-   	/* Lọc theo bộ phận */
-	IF (dept_ IS NOT NULL) Then
-        SET query_ = CONCAT(query_ , ' AND c.id = ''', dept_, '''');
-   END IF;
-   /* Lọc tương tác với các biểu đồ*/
-   If (col_ = 'name') Then
-   	SET query_ = CONCAT(query_, ' AND d.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'dept') Then
-   	SET query_ = CONCAT(query_, ' AND c.name = ''', values_, '''');
-   END IF;
-   If (col_ = 'LoaiHinh') Then
-		SET query_lh = CASE WHEN values_ IN ('suspended', 'wait') THEN CONCAT(' AND d.status = ''', values_ ,'''')
-								  WHEN values_ = 'doing (delay)' THEN ' AND d.status = ''doing'' AND CURDATE() > d.end'
-								  WHEN values_ = 'doing' THEN ' AND d.status = ''doing'' AND CURDATE() <= d.end' 
-								  WHEN values_ = 'closed (delay)' THEN ' AND d.status = ''closed'' AND d.end < CAST(d.closedDate AS DATE)'
-								  WHEN values_ = 'closed (on-time)' THEN ' AND d.status = ''closed'' AND d.end = CAST(a.closedDate AS DATE)'
-								  WHEN values_ = 'closed' THEN ' AND d.status = ''closed'' AND d.closedDate = ''0000-00-00 00:00:00'''
-								  ELSE ' AND d.status = ''closed'' AND d.end > CAST(d.closedDate AS DATE)' END;
-								  
-   	SET query_ = CONCAT(query_, query_lh);
-   END IF;	
-	SET query_ = CONCAT(query_ ,' GROUP BY c.name order by COUNT(DISTINCT a.project)/(SELECT COUNT(*) FROM zt_project WHERE deleted = ''0'') desc ');
-	
-	SET @SQL := query_;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_all
-DELIMITER //
-CREATE PROCEDURE `dsa_task_all`(
-	IN `id_proc` VARCHAR(35),
+CREATE PROCEDURE `dsa_account`(
+	IN `id_proc` VARCHAR(50),
+	IN `timetype` INT,
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` VARCHAR(50),
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `start_revenue` DECIMAL(25,8),
+	IN `end_revenue` DECIMAL(25,8),
+	IN `start_employee` INT,
+	IN `end_employee` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+
 )
 BEGIN
-
-	IF id_proc = 'detail_open' THEN
-		CALL `dsa_task_all_detail_open`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_) ;
+   
+	IF id_proc = 'ov_account' THEN
+		CALL dsa_account_total_account(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
 	END IF;
 	
-	IF id_proc = 'detail_finish' THEN
-		CALL `dsa_task_all_detail_finish`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_) ;
+	IF id_proc = 'ov_contact' THEN
+		CALL dsa_account_total_contact(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
 	END IF;
 	
-	IF id_proc = 'detail_assign' THEN
-		CALL `dsa_task_all_detail_assign`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_) ;
-	END IF;
-
-	IF id_proc = 'delay_detail' THEN
-		CALL `dsa_task_delay_detail`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_) ;
+	IF id_proc = 'ov_potential' THEN
+		CALL dsa_account_total_potential(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
 	END IF;
 	
-	IF id_proc = 'num_hour_bytime' THEN
-		CALL `dsa_task_num_hour_bytime`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
+	IF id_proc = 'ov_salesorder' THEN
+		CALL dsa_account_total_salesorder(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
 	END IF;
 	
-	IF id_proc = 'num_est_hour_bytime' THEN
-		CALL `dsa_task_num_est_hour_bytime`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
 	
-	IF id_proc = 'num_pri' THEN
-		CALL `dsa_task_num_pri`(start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
 	
-	IF id_proc = 'num_task_byproject' THEN
-		CALL `dsa_task_num_task_byproject` (start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
-	
-	IF id_proc = 'num_task_bystory' THEN
-		CALL `dsa_task_num_task_bystory` (start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
-	
-	IF id_proc = 'num_task_bytime' THEN
-		CALL `dsa_task_num_task_bytime` (start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
-	
-	IF id_proc = 'total_delay_task' THEN
-		CALL `dsa_task_total_delay_task` (start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
-	
-	IF id_proc = 'total_hour' THEN
-		CALL `dsa_task_total_hour` (start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
-	
-	IF id_proc = 'total_task' THEN
-		CALL `dsa_task_total_task` (start_date, end_date, project_id, username, story, dept, col, val, year_, month_, day_);
-	END IF;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_all_detail_assign
-DELIMITER //
-CREATE PROCEDURE `dsa_task_all_detail_assign`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
-	
-	-- Liệt kê các trường dữ liệu cần hiển thị của 2 bảng zt_task, zt_project
-	SET QUERY1 = 
-	'SELECT
-		p.name as ''Dự án'',
-		t.status as ''Trạng thái'',
-		t.assignedTo as ''Người được giao'',
-		t.name as ''Tên task'',
-		t.assignedDate as ''Ngày giao task'',
-		t.realStarted as ''Ngày bắt đầu'', 
-		t.estimate as ''Số giờ ước tính'', 
-		t.consumed as ''Số giờ thực hiện'', 
-		t.deadline as ''Deadline''
-	FROM
-		zt_task t
-	INNER JOIN
-		zt_project p
-	ON
-		t.project = p.id 
-	WHERE 1=1 ';
-	
-	-- Lọc các task , project chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, 'AND t.deleted <> ''1'' AND p.deleted <> ''1'' ');
-	
-	-- Lọc các task có thời gian mở nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo mức độ ưu tiên
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <>'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
 		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
+	IF id_proc = 'user_assign' THEN
+		CALL dsa_account_user_assign(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_marketing' THEN
+		CALL dsa_account_user_marketing(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_service' THEN
+		CALL dsa_account_user_service(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
 		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
+	IF id_proc = 'bar_status' THEN
+		CALL dsa_account_status(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
 		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
 		
-		ELSE SELECT 1;
+	IF id_proc = 'industry' THEN
+		CALL dsa_account_industry(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	
+	
+	
 		
-	END CASE;
-	
-	-- Sắp xếp theo ngày mở task
-	SET QUERY1 = CONCAT(QUERY1,' ORDER BY 5 DESC');
-	
-	-- In và khởi chạy query
-	-- SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_all_detail_finish
-DELIMITER //
-CREATE PROCEDURE `dsa_task_all_detail_finish`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
-	
-	-- Liệt kê các trường dữ liệu cần hiển thị của 2 bảng zt_task, zt_project
-	SET QUERY1 = 
-	'SELECT
-		p.name as ''Dự án'',
-		t.status as ''Trạng thái'',
-		t.finishedBy as ''Người hoàn thành'',
-		t.name as ''Tên task'',
-		t.finishedDate as ''Ngày hoàn thành'',
-		t.realStarted as ''Ngày bắt đầu'', 
-		t.estimate as ''Số giờ ước tính'', 
-		t.consumed as ''Số giờ thực hiện'', 
-		t.deadline as ''Deadline''
-	FROM
-		zt_task t
-	INNER JOIN
-		zt_project p
-	ON
-		t.project = p.id 
-	WHERE 1=1 ';
-	
-	-- Lọc các task , project chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, 'AND t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.status IN (''done'', ''closed'')');
-	
-	-- Lọc các task có thời gian mở nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' ) ' );
+	IF id_proc = 'user_detail' THEN
+		CALL dsa_account_user_detail(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
 	END IF;
 	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedBy = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo mức độ ưu tiên
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedBy IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <>'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\') ');
 		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'') ' );
+	IF id_proc = 'contact' THEN
+		CALL dsa_account_contact(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
 		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'') ' );
-		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-	
-	-- Sắp xếp theo ngày mở task
-	SET QUERY1 = CONCAT(QUERY1,' ORDER BY t.finishedDate DESC');
-	
-	-- In và khởi chạy query
-	-- SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_all_detail_open
-DELIMITER //
-CREATE PROCEDURE `dsa_task_all_detail_open`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
-	
-	-- Liệt kê các trường dữ liệu cần hiển thị của 2 bảng zt_task, zt_project
-	SET QUERY1 = 
-	'SELECT
-		p.name as ''Dự án'',
-		t.status as ''Trạng thái'',
-		t.assignedTo as ''Người được giao'',
-		t.name as ''Tên task'',
-		t.openedDate as ''Ngày mở task'',
-		t.realStarted as ''Ngày bắt đầu'', 
-		t.estimate as ''Số giờ ước tính'', 
-		t.consumed as ''Số giờ thực hiện'', 
-		t.deadline as ''Deadline''
-	FROM
-		zt_task t
-	INNER JOIN
-		zt_project p
-	ON
-		t.project = p.id 
-	WHERE 1=1 ';
-	
-	-- Lọc các task , project chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, 'AND t.deleted <> ''1'' AND p.deleted <> ''1'' ');
-	
-	-- Lọc các task có thời gian mở nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <>'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-	
-	-- Sắp xếp theo ngày mở task
-	SET QUERY1 = CONCAT(QUERY1,' ORDER BY 5 DESC');
-	
-	-- In và khởi chạy query
-	SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_ddl_all
-DELIMITER //
-CREATE PROCEDURE `dsa_task_ddl_all`(
-	IN `id_ddl` VARCHAR(35)
-)
-BEGIN
-	IF id_ddl = 'ddl_task_project' THEN
-		CALL `dsa_task_ddl_project`;
-	END IF;
-	
-	IF id_ddl = 'ddl_task_user' THEN
-		CALL `dsa_task_ddl_user`;
-	END IF;
-	
-	IF id_ddl = 'ddl_task_story' THEN
-		CALL `dsa_task_ddl_story`;
-	END IF;
-	
-	IF id_ddl = 'ddl_task_dept' THEN
-		CALL `dsa_task_ddl_dept`;
-	END IF;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_ddl_dept
-DELIMITER //
-CREATE PROCEDURE `dsa_task_ddl_dept`()
-BEGIN
-	SELECT 
-		id,
-		CONCAT(name, ' (', id, ')') as department
-	FROM
-		zt_dept;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_ddl_project
-DELIMITER //
-CREATE PROCEDURE `dsa_task_ddl_project`()
-BEGIN
-	SELECT 
-		DISTINCT p.id, 
-		CONCAT(p.NAME,' (',p.id,')') project_name 
-	FROM 
-		zt_project p 
-	INNER JOIN 
-		zt_task t 
-	ON 
-		p.id = t.project 
-	WHERE 
-		t.deleted = '0' 
-		AND p.deleted = '0'
-	ORDER BY 2;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_ddl_story
-DELIMITER //
-CREATE PROCEDURE `dsa_task_ddl_story`()
-BEGIN
-	SELECT 
-		DISTINCT s.id, 
-		CONCAT(s.title,' (',s.id,')') story_name 
-	FROM 
-		zt_story s 
-	INNER JOIN 
-		zt_task t 
-	ON 
-		s.id = t.story 
-	WHERE 
-		t.deleted = '0' 
-		AND s.deleted = '0'
-	ORDER BY 2;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_ddl_user
-DELIMITER //
-CREATE PROCEDURE `dsa_task_ddl_user`()
-BEGIN
-	SELECT 
-		account, 
-		CONCAT(realname, ' (', account,')') 
-	FROM 
-		zt_user 
-	WHERE 
-		deleted = '0'
-	ORDER BY 1;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_delay_detail
-DELIMITER //
-CREATE PROCEDURE `dsa_task_delay_detail`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
-	
-	-- Liệt kê các trường dữ liệu cần hiển thị của 2 bảng zt_task, zt_project
-	SET QUERY1 = 
-	'SELECT
-		p.name as ''p.name'',
-		t.name as ''t.name'',
-		t.assignedTo as ''t.assignedTo'',
-		t.status as ''t.status'',
-		DATEDIFF(DATE(NOW()), DATE(t.deadline)) AS delay_days
-	FROM
-		zt_task t
-	INNER JOIN
-		zt_project p
-	ON
-		t.project = p.id
-	WHERE 1=1 ';
-	
-	-- Lọc các task có trạng thái chưa hoàn thành và cũng không xóa, cũng như project chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, 'AND t.STATUS IN (''doing'', ''wait'', ''pause'') AND t.deleted <> ''1'' AND p.deleted <> ''1'' AND NOT (t.deadline = ''0000-00-00'' AND t.status=''wait'')');
-	
-	-- Lọc các task có thời gian tương tác lần cuối nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.deadline BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	-- col, val
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col<>'s.title' AND col <> 'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
 			
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-	END CASE;
+	IF id_proc = 'potential_salesorder' THEN
+		CALL dsa_account_potential_salesorder(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
 	
-	-- Lọc các task delay trên 7 ngày và sắp xếp theo số ngày delay giảm dần
-	SET QUERY1  = CONCAT(QUERY1, ' HAVING Delay_Days >= 7 ORDER BY Delay_Days DESC');
+		
+	IF id_proc = 'revenue_employee' THEN
+		CALL dsa_account_revenue_employee(start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,start_revenue,end_revenue,start_employee,end_employee,col,val);
+	END IF;
+		
+		
+	IF id_proc = 'contact_leadsource' THEN
+		CALL dsa_account_contact_leadsource(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
 	
-	-- In và khởi chạy query
-	SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
+	IF id_proc = 'account_detail' THEN
+		CALL dsa_account_detail(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,start_revenue,end_revenue,start_employee,end_employee,col,val);
+	END IF;
+	
+		
+	IF id_proc = 'city' THEN
+		CALL dsa_account_city(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	
+	IF id_proc = 'account_day' THEN
+		CALL dsa_account_day(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'account_month' THEN
+		CALL dsa_account_month(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'account_quarter' THEN
+		CALL dsa_account_quarter(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'account_year' THEN
+		CALL dsa_account_year(timetype,start_date,end_date,leadsource,industry,account_id,user_assign,user_marketing,user_service,dept_id,col,val);
+	END IF;
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_task_num_est_hour_bytime
+-- Dumping structure for procedure crm.dsa_account_city
 DELIMITER //
-CREATE PROCEDURE `dsa_task_num_est_hour_bytime`(
+CREATE PROCEDURE `dsa_account_city`(
+	IN `timetype` INT,
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT ad.ship_city, COUNT(DISTINCT c.crmid) AS ''num_account''
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY 1');
+	
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_day
+DELIMITER //
+CREATE PROCEDURE `dsa_account_day`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CONCAT(Day(c.createdtime),''/'',Month(c.createdtime),''/'', Year(c.createdtime)), COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	
+	
+	SET myquery_2 = CONCAT('SELECT CONCAT(Day(c.modifiedtime),''/'',Month(c.modifiedtime),''/'', Year(c.modifiedtime)), COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');						
+								
+	
+	SET myquery_1 = CONCAT(myquery_1,' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2,' AND c.deleted = ''0''');	
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND cts.leadsource = ''',leadsource,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.industry = ''',industry,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.accountid = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_marketing = ''',user_marketing,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_service = ''',user_service,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug1.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.crmid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery_1 = CONCAT (myquery_1,' GROUP BY 1 ORDER BY YEAR(c.createdtime), MONTH(c.createdtime), DAY(c.createdtime)');
+	SET myquery_2 = CONCAT (myquery_2,' GROUP BY 1 ORDER BY YEAR(c.modifiedtime), MONTH(c.modifiedtime), DAY(c.modifiedtime)');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1 OR timetype IS NULL) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl`(
+	IN `id_ddl` VARCHAR(50),
+	IN `id_account` INT,
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_industry` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_assign` INT,
+	IN `id_user_marketing` VARCHAR(50),
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	IF id_ddl = 'ddl_account' THEN
+		CALL dsa_account_ddl_account(id_leadsource,id_industry,id_dept,id_user_assign,id_user_marketing,id_user_service);
+	END IF;
+	
+	IF id_ddl = 'ddl_dept' THEN
+		CALL dsa_account_ddl_dept(id_account,id_leadsource,id_industry,id_user_assign,id_user_marketing,id_user_service);
+	END IF;
+	
+	IF id_ddl = 'ddl_industry' THEN
+		CALL dsa_account_ddl_industry(id_account,id_leadsource,id_dept,id_user_assign,id_user_marketing,id_user_service);
+	END IF;
+	
+	IF id_ddl = 'ddl_leadsource' THEN
+		CALL dsa_account_ddl_leadsource(id_account,id_industry,id_dept,id_user_assign,id_user_marketing,id_user_service);
+	END IF;
+	
+	IF id_ddl = 'ddl_user_assign' THEN
+		CALL dsa_account_ddl_user_assign(id_account,id_leadsource,id_industry,id_dept,id_user_marketing,id_user_service);
+	END IF;
+	
+	IF id_ddl = 'ddl_user_marketing' THEN
+		CALL dsa_account_ddl_user_marketing(id_account,id_leadsource,id_industry,id_dept,id_user_assign,id_user_service);
+	END IF;
+	
+	IF id_ddl = 'ddl_user_service' THEN
+		CALL dsa_account_ddl_user_service(id_account,id_leadsource,id_industry,id_dept,id_user_assign,id_user_marketing);
+	END IF;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_account
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_account`(
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_industry` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_assign` INT,
+	IN `id_user_marketing` VARCHAR(50),
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT c.crmid, CONCAT(c.label,'' ('', a.account_no, '')'')
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								WHERE c.deleted = ''0''');	
+	
+	IF (id_leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',id_leadsource,'''');
+	END IF;
+	
+	
+	IF (id_industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',id_industry,'''');
+	END IF;
+	
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',id_dept,'''');
+	END IF;
+	
+	
+	IF(id_user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',id_user_assign,'''');
+	END IF;
+	
+	
+	IF(id_user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',id_user_marketing,'''');
+	END IF;	
+
+	
+	IF(id_user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',id_user_service,'''');
+	END IF;
+
+		
+	
+								
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_dept
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_dept`(
+	IN `id_account` INT,
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_industry` VARCHAR(50),
+	IN `id_user_assign` INT,
+	IN `id_user_marketing` VARCHAR(50),
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+
+	SET myquery = CONCAT('SELECT DISTINCT g.groupid, g.groupname 
+								FROM vtiger_groups g
+
+								LEFT JOIN vtiger_users2group ug
+								ON g.groupid = ug.groupid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN (SELECT accountid,account_no,accountname,
+														CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+														annualrevenue,employees,isconvertedfromlead
+												FROM vtiger_account) a
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+																
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								WHERE 1=1');
+	
+	
+	IF (id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',id_account,'''');
+	END IF;
+						
+	
+	IF (id_leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',id_leadsource,'''');
+	END IF;
+	
+	
+	IF (id_industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',id_industry,'''');
+	END IF;
+	
+	
+	
+	IF(id_user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.userid = ''',id_user_assign,'''');
+	END IF;
+	
+	
+	IF(id_user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',id_user_marketing,'''');
+	END IF;	
+
+	
+	IF(id_user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',id_user_service,'''');
+	END IF;
+							
+
+	SET myquery = CONCAT(myquery,' ORDER BY g.groupname');
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_industry
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_industry`(
+	IN `id_account` INT,
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_assign` INT,
+	IN `id_user_marketing` VARCHAR(50),
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT a.industry
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+										
+								JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								WHERE 1=1');
+	
+	
+	IF (id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',id_account,'''');
+	END IF;
+						
+	
+	IF (id_leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',id_leadsource,'''');
+	END IF;
+
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',id_dept,'''');
+	END IF;
+	
+	
+	IF(id_user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug1.userid = ''',id_user_assign,'''');
+	END IF;
+	
+	
+	IF(id_user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',id_user_marketing,'''');
+	END IF;	
+
+	
+	IF(id_user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',id_user_service,'''');
+	END IF;
+								
+	SET myquery = CONCAT(myquery,' ORDER BY 1');
+								
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_leadsource
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_leadsource`(
+	IN `id_account` INT,
+	IN `id_industry` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_assign` INT,
+	IN `id_user_marketing` VARCHAR(50),
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT cts.leadsource
+								FROM (SELECT contactsubscriptionid,
+												CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+										FROM vtiger_contactsubdetails) cts
+								LEFT JOIN vtiger_contactdetails ctd
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN (SELECT accountid,account_no,accountname,
+														CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+														annualrevenue,employees,isconvertedfromlead
+											FROM vtiger_account) a
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								WHERE 1=1');
+								
+	
+	IF (id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',id_account,'''');
+	END IF;
+	
+	
+	IF (id_industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',id_industry,'''');
+	END IF;					
+
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',id_dept,'''');
+	END IF;
+	
+	
+	IF(id_user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug1.userid = ''',id_user_assign,'''');
+	END IF;
+	
+	
+	IF(id_user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',id_user_marketing,'''');
+	END IF;	
+
+	
+	IF(id_user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',id_user_service,'''');
+	END IF;									
+										
+	SET myquery = CONCAT(myquery,' ORDER BY 1');
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_user_assign
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_user_assign`(
+	IN `id_account` INT,
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_industry` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_marketing` VARCHAR(50),
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+
+	SET myquery = CONCAT('SELECT DISTINCT u.id, CONCAT(u.last_name,'' '', u.first_name, '' ('', u.user_name, '')'')
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								
+								LEFT JOIN (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+											FROM vtiger_account) a
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+																
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource = '''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = u.id
+																
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								WHERE u.deleted = ''0'' AND u.status = ''Active''');
+	
+	
+	IF (id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',id_account,'''');
+	END IF;
+	
+	
+	IF (id_leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',id_leadsource,'''');
+	END IF;
+	
+	
+	IF (id_industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',id_industry,'''');
+	END IF;					
+
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',id_dept,'''');
+	END IF;
+	
+	
+	IF(id_user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',id_user_marketing,'''');
+	END IF;	
+
+	
+	IF(id_user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',id_user_service,'''');
+	END IF;									
+										
+	
+								
+
+	
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_user_marketing
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_user_marketing`(
+	IN `id_account` INT,
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_industry` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_assign` INT,
+	IN `id_user_service` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT 
+													CASE WHEN u.user_name IS NOT NULL AND u.status = ''Active'' THEN u.user_name
+															WHEN u.status IS NULL THEN acf.user_marketing END ''id'', 
+															
+													CASE WHEN u.user_name IS NOT NULL AND u.status = ''Active'' THEN CONCAT(u.last_name,'' '', u.first_name, '' ('', u.user_name, '')'') 
+															WHEN u.status IS NULL THEN acf.user_marketing END ''name''
+															
+								FROM (SELECT accountid, 
+												CASE WHEN cf_773 = '''' THEN ''Không có'' ELSE cf_773 END AS ''user_marketing'',
+												CASE WHEN cf_775 = '''' THEN ''Không có'' ELSE cf_775 END AS ''user_service'',
+												CASE WHEN cf_891 = '''' THEN ''Unknown'' ELSE cf_891 END AS ''status''
+										FROM vtiger_accountscf ) acf
+								
+								LEFT JOIN vtiger_users u
+								ON u.user_name = acf.user_marketing
+								
+								LEFT JOIN (SELECT accountid,account_no,accountname,
+																				CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+																				annualrevenue,employees,isconvertedfromlead
+																		FROM vtiger_account) a
+								ON acf.accountid = a.accountid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+																
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+
+								WHERE (u.status = ''Active'' OR u.status IS NULL)');
+	
+	
+	IF (id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',id_account,'''');
+	END IF;
+	
+	
+	IF (id_leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',id_leadsource,'''');
+	END IF;
+	
+	
+	IF (id_industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',id_industry,'''');
+	END IF;					
+
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',id_dept,'''');
+	END IF;
+		
+	
+	IF(id_user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug1.userid = ''',id_user_assign,'''');
+	END IF;
+	
+	
+	IF(id_user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',id_user_service,'''');
+	END IF;									
+																						
+								
+	SET myquery = CONCAT(myquery,' ORDER BY 1');
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_ddl_user_service
+DELIMITER //
+CREATE PROCEDURE `dsa_account_ddl_user_service`(
+	IN `id_account` INT,
+	IN `id_leadsource` VARCHAR(50),
+	IN `id_industry` VARCHAR(50),
+	IN `id_dept` INT,
+	IN `id_user_assign` INT,
+	IN `id_user_marketing` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT 
+													CASE WHEN u.user_name IS NOT NULL AND u.status = ''Active'' THEN u.user_name
+															WHEN acf.user_service IS NOT NULL AND u.status IS NULL THEN acf.user_service END ''id'', 
+													CASE WHEN u.user_name IS NOT NULL AND u.status = ''Active'' THEN CONCAT(u.last_name,'' '', u.first_name, '' ('', u.user_name, '')'') 
+															WHEN acf.user_service IS NOT NULL AND u.status IS NULL THEN acf.user_service END ''name''
+								
+								FROM (SELECT accountid, 
+												CASE WHEN cf_773 = '''' THEN ''Không có'' ELSE cf_773 END AS ''user_marketing'',
+												CASE WHEN cf_775 = '''' THEN ''Không có'' ELSE cf_775 END AS ''user_service'',
+												CASE WHEN cf_891 = '''' THEN ''Unknown'' ELSE cf_891 END AS ''status''
+										FROM vtiger_accountscf ) acf
+																
+								LEFT JOIN vtiger_users u
+								ON u.user_name = acf.user_service
+								
+								LEFT JOIN (SELECT accountid,account_no,accountname,
+													CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+													annualrevenue,employees,isconvertedfromlead
+												FROM vtiger_account) a
+								ON acf.accountid = a.accountid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+																
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								WHERE (u.status = ''Active'' OR u.status IS NULL)');
+									
+	
+	IF (id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',id_account,'''');
+	END IF;
+	
+	
+	IF (id_leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',id_leadsource,'''');
+	END IF;
+	
+	
+	IF (id_industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',id_industry,'''');
+	END IF;					
+
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',id_dept,'''');
+	END IF;
+		
+	
+	IF(id_user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug1.userid = ''',id_user_assign,'''');
+	END IF;
+	
+	
+	IF(id_user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',id_user_marketing,'''');
+	END IF;									
+																						
+								
+	SET myquery = CONCAT(myquery,' ORDER BY 1');
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_account_detail`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `start_revenue` DECIMAL(25,8),
+	IN `end_revenue` DECIMAL(25,8),
+	IN `start_employee` INT,
+	IN `end_employee` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT c.crmid, c.crmid, 
+										CONCAT(''['',c.label, '' ('',a.account_no, '')'', '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c.crmid,''&app=SUPPORT)'') AS ''c.label'',
+										a.industry, 
+										ad.ship_city,
+										COUNT(DISTINCT (CASE WHEN (c2.deleted = ''0'' AND ctd.contactid IS NOT NULL) THEN ctd.contactid ELSE NULL END)) AS SL_contact,										
+										COUNT(DISTINCT (CASE WHEN (c3.deleted = ''0'' OR p.potentialid IS NOT NULL) THEN p.potentialid ELSE NULL END)) AS SL_potential,
+										COUNT(DISTINCT (CASE WHEN (c4.deleted = ''0'' OR so.salesorderid IS NOT NULL) THEN so.salesorderid ELSE NULL END)) AS SL_salesorder,
+										a.annualrevenue,
+										a.employees, 
+										CONCAT(Day(c.createdtime),''/'',Month(c.createdtime),''/'', Year(c.createdtime)) AS ''c.createdtime'',
+										CONCAT(Day(c.modifiedtime),''/'',Month(c.modifiedtime),''/'', Year(c.modifiedtime)) AS ''c.modifiedtime''
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid								
+								
+								LEFT JOIN vtiger_potential p 
+								ON a.accountid = p.related_to
+								
+								LEFT JOIN vtiger_salesorder so
+								ON a.accountid = so.accountid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON ctd.contactid = c2.crmid
+								
+								LEFT JOIN vtiger_crmentity c3
+								ON p.potentialid = c3.crmid
+								
+								LEFT JOIN vtiger_crmentity c4
+								ON so.salesorderid = c4.crmid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+
+								WHERE 1=1');
+	
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+		
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (start_revenue IS NOT NULL) AND (end_revenue IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND (a.annualrevenue BETWEEN ',start_revenue,' AND ', end_revenue,' ) ' );
+	END IF;
+	
+	IF (start_employee IS NOT NULL) AND (end_employee IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND (a.employees BETWEEN ',start_employee,' AND ', end_employee,' ) ' );
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT (myquery,' GROUP BY c.crmid ORDER BY c.label');
+						
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_industry
+DELIMITER //
+CREATE PROCEDURE `dsa_account_industry`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT a.industry, COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY 2 DESC, 1');
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_month
+DELIMITER //
+CREATE PROCEDURE `dsa_account_month`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CONCAT(Month(c.createdtime),''/'', Year(c.createdtime)) , COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	
+	
+	SET myquery_2 = CONCAT('SELECT CONCAT(Month(c.modifiedtime),''/'', Year(c.modifiedtime)), COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');						
+								
+	
+	SET myquery_1 = CONCAT(myquery_1,' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2,' AND c.deleted = ''0''');	
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND cts.leadsource = ''',leadsource,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.industry = ''',industry,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.accountid = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_marketing = ''',user_marketing,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_service = ''',user_service,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug1.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug1.groupid = ''',dept_id,'''');
+	END IF;
+
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.crmid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery_1 = CONCAT (myquery_1,' GROUP BY 1 ORDER BY YEAR(c.createdtime), MONTH(c.createdtime)');
+	SET myquery_2 = CONCAT (myquery_2,' GROUP BY 1 ORDER BY YEAR(c.modifiedtime), MONTH(c.modifiedtime)');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1 OR timetype IS NULL) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_quarter
+DELIMITER //
+CREATE PROCEDURE `dsa_account_quarter`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CONCAT(YEAR(c.createdtime),'' - Q'', QUARTER(c.createdtime)) , COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	
+	
+	SET myquery_2 = CONCAT('SELECT CONCAT(YEAR(c.modifiedtime),'' - Q'', QUARTER(c.modifiedtime)), COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');						
+								
+	
+	SET myquery_1 = CONCAT(myquery_1,' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2,' AND c.deleted = ''0''');	
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND cts.leadsource = ''',leadsource,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.industry = ''',industry,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.accountid = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_marketing = ''',user_marketing,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_service = ''',user_service,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug1.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.crmid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery_1 = CONCAT (myquery_1,' GROUP BY 1 ORDER BY YEAR(c.createdtime),QUARTER(c.createdtime) ');
+	SET myquery_2 = CONCAT (myquery_2,' GROUP BY 1 ORDER BY YEAR(c.modifiedtime),QUARTER(c.modifiedtime)');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1 OR timetype IS NULL) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_status
+DELIMITER //
+CREATE PROCEDURE `dsa_account_status`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT acf.status, COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								JOIN (SELECT accountid, 
+											CASE WHEN cf_891 = '''' THEN ''Unknown'' ELSE cf_891 END AS ''status''
+										FROM vtiger_accountscf ) acf
+									ON acf.accountid = c.crmid
+									
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid		
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY 2 DESC, 1');
+	
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_total_account
+DELIMITER //
+CREATE PROCEDURE `dsa_account_total_account`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+						
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+																
+								WHERE 1=1');
+	
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_total_contact
+DELIMITER //
+CREATE PROCEDURE `dsa_account_total_contact`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT c2.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON ctd.contactid = c2.crmid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+		
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_total_potential
+DELIMITER //
+CREATE PROCEDURE `dsa_account_total_potential`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT c2.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_potential p 
+								ON a.accountid = p.related_to
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON p.potentialid = c2.crmid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+								
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+		
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_total_salesorder
+DELIMITER //
+CREATE PROCEDURE `dsa_account_total_salesorder`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT c2.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+																
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_salesorder so
+								ON a.accountid = so.accountid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON so.salesorderid = c2.crmid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	
+		
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_user_assign
+DELIMITER //
+CREATE PROCEDURE `dsa_account_user_assign`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	SET myquery = CONCAT('SELECT c.smownerid,u.user_name AS ''NV_assign'', COUNT(DISTINCT c.crmid) as SL
+	
+									FROM (SELECT accountid,account_no,accountname,
+													CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+													annualrevenue,employees,isconvertedfromlead
+											FROM vtiger_account) a
+									
+									JOIN vtiger_crmentity c
+									ON a.accountid = c.crmid
+									
+									LEFT JOIN vtiger_contactdetails ctd
+									ON a.accountid = ctd.accountid
+									
+									
+									LEFT JOIN (SELECT contactsubscriptionid,
+															CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+													FROM vtiger_contactsubdetails) cts
+									ON cts.contactsubscriptionid = ctd.contactid		
+									
+									JOIN vtiger_users u
+									ON c.smownerid = u.id
+									
+									LEFT JOIN vtiger_users2group ug1
+									ON ug1.userid = c.smownerid
+									
+									LEFT JOIN vtiger_groups g1
+									ON g1.groupid = ug1.groupid
+									
+									LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+									ON ad.accountaddressid = c.crmid
+									
+									
+									WHERE 1=1 ');
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0'' AND u.status = ''Active''');	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');
+	
+		
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery,' GROUP BY 1 ORDER BY 3 DESC, 2');
+	
+
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_user_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_account_user_detail`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	
+	DECLARE myquery nvarchar(6000);
+
+	SET myquery = CONCAT('SELECT DISTINCT c.crmid, 
+										CONCAT(''['',c.label, '' ('',a.account_no, '')'', '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c.crmid,''&app=SUPPORT)'') AS ''c.label'',
+										c.smownerid, 
+										
+										CASE WHEN u.status = ''Active'' THEN u.user_name 
+											WHEN u.status = ''Inactive'' THEN CONCAT(u.user_name,'' (Đã nghỉ)'') 
+										END AS NV_assigned
+											
+									FROM (SELECT accountid,account_no,accountname,
+																CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+																annualrevenue,employees,isconvertedfromlead
+														FROM vtiger_account) a
+												
+									JOIN vtiger_crmentity c
+									ON a.accountid = c.crmid
+									
+									LEFT JOIN vtiger_contactdetails ctd
+									ON a.accountid = ctd.accountid
+									
+									
+									LEFT JOIN (SELECT contactsubscriptionid,
+															CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+													FROM vtiger_contactsubdetails) cts
+									ON cts.contactsubscriptionid = ctd.contactid
+						
+									JOIN vtiger_users u
+									ON c.smownerid = u.id
+									
+									LEFT JOIN vtiger_users2group ug1
+									ON ug1.userid = c.smownerid
+									
+									LEFT JOIN vtiger_groups g1
+									ON g1.groupid = ug1.groupid
+									
+									LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+									ON ad.accountaddressid = c.crmid
+									
+									
+									WHERE 1=1 ');
+
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');
+		
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery,' ORDER BY 2');
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_user_marketing
+DELIMITER //
+CREATE PROCEDURE `dsa_account_user_marketing`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+
+	SET myquery = CONCAT('SELECT acf.user_marketing AS NV_marketing, 
+											COUNT(DISTINCT c.crmid) AS SL
+											
+									FROM (SELECT accountid,account_no,accountname,
+													CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+													annualrevenue,employees,isconvertedfromlead
+											FROM vtiger_account) a
+												
+									JOIN vtiger_crmentity c
+									ON a.accountid = c.crmid
+									
+									LEFT JOIN vtiger_contactdetails ctd
+									ON a.accountid = ctd.accountid
+									
+									JOIN (SELECT accountid, 
+													CASE WHEN cf_773 = '''' THEN ''Không có'' ELSE cf_773 END AS ''user_marketing'',
+													CASE WHEN cf_775 = '''' THEN ''Không có'' ELSE cf_775 END AS ''user_service'',
+													CASE WHEN cf_891 = '''' THEN ''Unknown'' ELSE cf_891 END AS ''status''
+											FROM vtiger_accountscf ) acf
+									ON acf.accountid = c.crmid
+									
+									LEFT JOIN (SELECT contactsubscriptionid,
+															CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+													FROM vtiger_contactsubdetails) cts
+									ON cts.contactsubscriptionid = ctd.contactid
+						
+									JOIN vtiger_users u
+									ON c.smownerid = u.id
+									
+									LEFT JOIN vtiger_users2group ug1
+									ON ug1.userid = c.smownerid
+									
+									LEFT JOIN vtiger_groups g1
+									ON g1.groupid = ug1.groupid
+									
+									LEFT JOIN vtiger_users u_mkt
+									ON u_mkt.user_name = acf.user_marketing
+									
+									LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+									ON ad.accountaddressid = c.crmid
+									
+									
+									WHERE 1=1 ');
+
+	SET myquery = CONCAT(myquery, ' AND (u_mkt.status = ''Active'' OR u_mkt.status IS NULL)');	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');
+			
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+
+	SET myquery = CONCAT(myquery,' GROUP BY 1 ORDER BY 2 DESC, 1');
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_user_service
+DELIMITER //
+CREATE PROCEDURE `dsa_account_user_service`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+
+	SET myquery = CONCAT('SELECT acf.user_service AS NV_gioithieu, 
+											COUNT(DISTINCT c.crmid) AS SL
+											
+									FROM (SELECT accountid,account_no,accountname,
+													CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+													annualrevenue,employees,isconvertedfromlead
+											FROM vtiger_account) a
+												
+									JOIN vtiger_crmentity c
+									ON a.accountid = c.crmid
+									
+									LEFT JOIN vtiger_contactdetails ctd
+									ON a.accountid = ctd.accountid
+									
+									JOIN (SELECT accountid, 
+													CASE WHEN cf_773 = '''' THEN ''Không có'' ELSE cf_773 END AS ''user_marketing'',
+													CASE WHEN cf_775 = '''' THEN ''Không có'' ELSE cf_775 END AS ''user_service'',
+													CASE WHEN cf_891 = '''' THEN ''Unknown'' ELSE cf_891 END AS ''status''
+											FROM vtiger_accountscf ) acf
+									ON acf.accountid = c.crmid
+									
+									LEFT JOIN (SELECT contactsubscriptionid,
+															CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+													FROM vtiger_contactsubdetails) cts
+									ON cts.contactsubscriptionid = ctd.contactid
+									
+									JOIN vtiger_users u
+									ON c.smownerid = u.id
+									
+									LEFT JOIN vtiger_users2group ug1
+									ON ug1.userid = c.smownerid
+									
+									LEFT JOIN vtiger_groups g1
+									ON g1.groupid = ug1.groupid
+									
+									LEFT JOIN vtiger_users u_sv
+									ON u_sv.user_name = acf.user_service
+									
+									LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+									ON ad.accountaddressid = c.crmid
+									
+									WHERE 1=1 ');
+	
+
+	SET myquery = CONCAT(myquery, ' AND (u_sv.status = ''Active'' OR u_sv.status IS NULL)');	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');
+			
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery,' GROUP BY 1 ORDER BY 2 DESC, 1');
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_account_year
+DELIMITER //
+CREATE PROCEDURE `dsa_account_year`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `leadsource` VARCHAR(50),
+	IN `industry` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `user_marketing` VARCHAR(50),
+	IN `user_service` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CAST(Year(c.createdtime) AS CHAR) , COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+								
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');
+	
+	
+	SET myquery_2 = CONCAT('SELECT CAST(Year(c.modifiedtime) AS CHAR), COUNT(DISTINCT c.crmid)
+								
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON a.accountid = c.crmid
+								
+								LEFT JOIN vtiger_contactdetails ctd
+								ON a.accountid = ctd.accountid
+						
+								
+								LEFT JOIN (SELECT contactsubscriptionid,
+														CASE WHEN leadsource='''' OR leadsource IS NULL THEN ''Unknown'' ELSE leadsource END AS ''leadsource''
+												FROM vtiger_contactsubdetails) cts
+								ON cts.contactsubscriptionid = ctd.contactid
+								
+								LEFT JOIN vtiger_users2group ug1
+								ON ug1.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g1
+								ON g1.groupid = ug1.groupid
+						
+								LEFT JOIN (SELECT accountaddressid,
+												CASE WHEN ship_city='''' OR ship_city IS NULL THEN ''Unknown'' ELSE ship_city END AS ''ship_city''
+												FROM vtiger_accountshipads) ad
+								ON ad.accountaddressid = c.crmid
+								
+								WHERE 1=1');						
+								
+	
+	SET myquery_1 = CONCAT(myquery_1,' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2,' AND c.deleted = ''0''');	
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF (leadsource IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND cts.leadsource = ''',leadsource,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND cts.leadsource = ''',leadsource,'''');
+	END IF;
+	
+	
+	IF (industry IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.industry = ''',industry,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.industry = ''',industry,'''');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.accountid = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.accountid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(user_marketing IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_marketing = ''',user_marketing,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_marketing = ''',user_marketing,'''');
+	END IF;	
+
+	
+	IF(user_service IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND acf.user_service = ''',user_service,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND acf.user_service = ''',user_service,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug1.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug1.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'NV_assign') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.crmid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'NV_assign' AND col != 'c.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery_1 = CONCAT (myquery_1,' GROUP BY 1 ORDER BY 1');
+	SET myquery_2 = CONCAT (myquery_2,' GROUP BY 1 ORDER BY 1');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1 OR timetype IS NULL) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_all
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_all`(
+	IN `id_proc` VARCHAR(35),
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `start_revenue` DOUBLE,
+	IN `end_revenue` DOUBLE,
+	IN `start_emp` INT,
+	IN `end_emp` INT,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
 	IN `dept` INT,
+	IN `city` VARCHAR(50),
 	IN `col` VARCHAR(300),
 	IN `val` VARCHAR(300),
 	IN `year_` ENUM('Y','N'),
 	IN `month_` ENUM('Y','N'),
+	IN `quarter_` ENUM('Y','N'),
 	IN `day_` ENUM('Y','N')
 )
 BEGIN
-	DECLARE QUERY1_1 NVARCHAR(4000);
-	DECLARE QUERY2_1 NVARCHAR(4000);
-	DECLARE QUERY3_1 NVARCHAR(4000);
-	DECLARE QUERY4_1 NVARCHAR(4000);
-	DECLARE QUERY1_2 NVARCHAR(4000);
-	DECLARE QUERY2_2 NVARCHAR(4000);
-	DECLARE QUERY3_2 NVARCHAR(4000);
-	DECLARE QUERY4_2 NVARCHAR(4000);
+	
+	IF id_proc = 'total_lead' THEN
+		CALL `dsa_lead_total_lead` (date_type,start_date, end_date, user_assign_id, status, SOURCE, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'total_industry' THEN
+		CALL `dsa_lead_total_industry` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'total_city' THEN
+		CALL `dsa_lead_total_city` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'num_lead_bystatus' THEN
+		CALL `dsa_lead_num_lead_bystatus` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'num_lead_byuser' THEN
+		CALL `dsa_lead_num_lead_byuser` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'num_lead_bysource_status' THEN
+		CALL `dsa_lead_num_lead_bysource_status` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'num_lead_bysource' THEN
+		CALL `dsa_lead_num_lead_bysource` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'lead_detail' THEN
+		CALL `dsa_lead_detail` (date_type,start_date, end_date, start_revenue, end_revenue, start_emp, end_emp, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+	
+	IF id_proc = 'comment_detail' THEN
+		CALL `dsa_lead_comment_detail` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;
+
+	IF id_proc = 'num_lead_byindustry' THEN
+		CALL `dsa_lead_num_lead_byindustry` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;	
+
+	IF id_proc = 'num_lead_bycity' THEN
+		CALL `dsa_lead_num_lead_bycity` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val);
+	END IF;	
+	
+	IF id_proc = 'num_lead_bytime' THEN
+		CALL `dsa_lead_num_lead_bytime` (date_type,start_date, end_date, user_assign_id, status, source, lead1, dept, city, col, val, year_, month_,quarter_, day_);
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_comment_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_comment_detail`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+
+
+)
+BEGIN
+	DECLARE QUERY NVARCHAR(4000);
+	DECLARE QUERY1 NVARCHAR(4000);
+	DECLARE QUERY2 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'(SELECT  
+		CONCAT(''['',ld.company, '' ('',ld.lead_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Leads&relatedModule=ModComments&view=Detail&record='',ld.leadid,''&mode=showRelatedList&relationId=156&tab_label=ModComments&app=MARKETING)'')  as ''company'',
+		m.modcommentsid id,
+		CONCAT(u.last_name, '' '', u.first_name) name,
+		m.commentcontent content,
+		c.createdtime time
+	FROM 
+		((((vtiger_modcomments m
+	INNER JOIN
+		vtiger_leaddetails ld
+	ON
+		ld.leadid = m.related_to)
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = m.modcommentsid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		u.id = m.userid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	WHERE 
+		m.parent_comments = 0 AND c.deleted = 0 AND 1=1 ';
+
+	SET QUERY2 = 
+	'(
+	SELECT
+	   CONCAT(''['',ld.company, '' ('',ld.lead_no, '')'', '']'',''(http://uatcrm.fastdn.com.vn/index.php?module=Leads&relatedModule=ModComments&view=Detail&record='',ld.leadid,''&mode=showRelatedList&relationId=156&tab_label=ModComments&app=MARKETING)'')  as ''company'',
+		m.parent_comments id,
+		CONCAT(u.last_name, '' '', u.first_name) name,
+		m.commentcontent content,
+		c.createdtime time
+	FROM
+		((((vtiger_modcomments m
+	INNER JOIN
+		vtiger_leaddetails ld
+	ON
+		ld.leadid = m.related_to)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		u.id = m.userid)
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = m.modcommentsid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	WHERE
+		m.parent_comments <> 0 AND c.deleted = 0';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 		SET QUERY2 = CONCAT(QUERY2,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (la.city = \'', city ,'\' )');
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+		SET QUERY2 = CONCAT(QUERY2,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+		SET QUERY1 = CONCAT(QUERY2,' AND (',col,' = '''' )');
+	END IF;
+
+	SET QUERY1 = CONCAT(QUERY1,')');
+	SET QUERY2 = CONCAT(QUERY2,')');
+
+	SET QUERY = CONCAT('
+	SELECT 
+		t1.company,
+		CONCAT(t1.name,'': '',t1.content) comment,
+		GROUP_CONCAT(t2.name, '': '', t2.content SEPARATOR ''\n'') answer
+	FROM ', QUERY1, 'as t1 LEFT JOIN ', QUERY2,' as t2 ON t1.id = t2.id GROUP BY 1, 2 ORDER BY t1.time, t2.time');
+	
+	
+	SELECT QUERY;
+	
+	SET @SQL := QUERY;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_all
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_all`(
+	IN `id_ddl` VARCHAR(50)
+)
+BEGIN
+	IF id_ddl = 'ddl_lead_company' THEN
+		CALL `dsa_lead_ddl_company`;
+	END IF;
+	
+	IF id_ddl = 'ddl_lead_dept' THEN
+		CALL `dsa_lead_ddl_dept`;
+	END IF;
+	
+	IF id_ddl = 'ddl_lead_source' THEN
+		CALL `dsa_lead_ddl_source`;
+	END IF;
+	
+	IF id_ddl = 'ddl_lead_status' THEN
+		CALL `dsa_lead_ddl_status`;
+	END IF;
+	
+	IF id_ddl = 'ddl_lead_assign' THEN
+		CALL `dsa_lead_ddl_user_assign`;
+	END IF;
+	
+	IF id_ddl = 'ddl_lead_city' THEN
+		CALL `dsa_lead_ddl_city`;
+	END IF;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_city
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_city`()
+BEGIN
+
+	SELECT
+		DISTINCT la.city
+	FROM
+		((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	WHERE
+		c.deleted = '0';
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_company
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_company`()
+BEGIN
+
+	SELECT
+		ld.company
+	FROM
+		vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid
+	WHERE
+		c.deleted = '0';
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_dept
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_dept`()
+BEGIN
+	SELECT
+		g.groupid,
+		CONCAT(g.groupname,' (', g.groupid,')')
+	FROM
+		vtiger_groups g;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_source
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_source`()
+BEGIN
+
+	SELECT
+		ls.leadsource
+	FROM
+		vtiger_leadsource ls;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_status
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_status`()
+BEGIN
+	SELECT
+		ls.leadstatus
+	FROM
+		vtiger_leadstatus ls;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_ddl_user_assign
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_ddl_user_assign`()
+BEGIN
+	SELECT
+		u.id,
+		CONCAT(u.last_name,' ', u.first_name, ' (', u.user_name, ')') 'u.name'
+	FROM
+		vtiger_users u
+	WHERE
+		u.deleted = '0';
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_detail`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `start_revenue` DOUBLE,
+	IN `end_revenue` DOUBLE,
+	IN `start_emp` INT,
+	IN `end_emp` INT,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			SET QUERY1 = 
+				'SELECT
+					CONCAT(''['',ld.company, '' ('',ld.lead_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Leads&view=Detail&record='',ld.leadid,''&app=MARKETING)'')  as ''ld.company'',
+					CONCAT(ld.lastname, ld.firstname) ''ld.name'',
+					u.user_name ''u.user_name'',
+					ld.leadsource ''ld.leadsource'',
+					ld.leadstatus ''ld.leadstatus'',
+					ld.noofemployees ''ld.noofemployees'',
+					ld.annualrevenue ''ld.annualrevenue'',
+					ld.industry ''ld.industry'',
+					la.city ''la.city'',
+					c.createdtime ''c.createdtime''
+					
+				FROM
+					((((vtiger_leaddetails ld
+				INNER JOIN
+					vtiger_crmentity c
+				ON
+					c.crmid = ld.leadid)
+				LEFT JOIN
+					vtiger_leadscf lcf
+				ON
+					ld.leadid = lcf.leadid)
+				LEFT JOIN
+					vtiger_leadaddress la
+				ON
+					la.leadaddressid = ld.leadid)
+				LEFT JOIN
+					vtiger_users u
+				ON
+					c.smownerid = u.id)
+			   WHERE 
+					c.deleted <> 1 AND 1=1 ';
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			SET QUERY1 = 
+				'SELECT
+					CONCAT(''['',ld.company, '' ('',ld.lead_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Leads&view=Detail&record='',ld.leadid,''&app=MARKETING)'')  as ''ld.company'',
+					CONCAT(ld.lastname, ld.firstname) ''ld.name'',
+					u.user_name ''u.user_name'',
+					ld.leadsource ''ld.leadsource'',
+					ld.leadstatus ''ld.leadstatus'',
+					ld.noofemployees ''ld.noofemployees'',
+					ld.annualrevenue ''ld.annualrevenue'',
+					ld.industry ''ld.industry'',
+					la.city ''la.city'',
+					c.modifiedtime ''c.createdtime''
+					
+				FROM
+					((((vtiger_leaddetails ld
+				INNER JOIN
+					vtiger_crmentity c
+				ON
+					c.crmid = ld.leadid)
+				LEFT JOIN
+					vtiger_leadscf lcf
+				ON
+					ld.leadid = lcf.leadid)
+				LEFT JOIN
+					vtiger_leadaddress la
+				ON
+					la.leadaddressid = ld.leadid)
+				LEFT JOIN
+					vtiger_users u
+				ON
+					c.smownerid = u.id)
+			   WHERE 
+					c.deleted <> 1 AND 1=1 ';
+			
+	END CASE;
+	
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	
+	IF start_revenue IS NOT NULL AND end_revenue IS NOT NULL THEN
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.annualrevenue BETWEEN ',start_revenue,' AND ', end_revenue,' ) ' );
+	END IF;
+	
+	
+	IF start_emp IS NOT NULL AND end_emp IS NOT NULL THEN
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.noofemployees BETWEEN ',start_emp,' AND ', end_emp,' ) ' );
+	END IF;
+
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_bycity
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_bycity`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+
+	
+	SET QUERY1 = 
+	'
+	SELECT
+		CASE 
+			WHEN la.city = '''' THEN ''Không xác định''
+			ELSE la.city
+		END ''la.city'',
+		
+		COUNT(ld.leadid) as num
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	INNER JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		lcf.leadid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1, 'GROUP BY la.city ORDER BY la.city DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_byindustry
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_byindustry`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	
+	
+	SET QUERY1 = 
+	'SELECT
+		
+		CASE 
+			WHEN ld.industry = '''' THEN ''Không xác định''
+			ELSE ld.industry
+		END ''ld.industry'',
+		
+		COUNT(ld.leadid) as num
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1, 'GROUP BY ld.industry ORDER BY num DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_bysource
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_bysource`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CASE 
+			WHEN ld.leadsource = '''' THEN ''Không xác định''
+			ELSE ld.leadsource
+		END as ''ld.leadsource'',
+	
+		COUNT(ld.leadid) as num
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1, ' GROUP BY ld.leadsource ORDER BY 2 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_bysource_status
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_bysource_status`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CASE 
+			WHEN ld.leadsource = '''' THEN ''Không xác định''
+			ELSE ld.leadsource
+		END as ''ld.leadsource'',
+		
+		CASE 
+			WHEN ld.leadstatus = '''' THEN ''Không xác định''
+			ELSE ld.leadstatus
+		END as ''ld.leadstatus'',
+	
+		COUNT(ld.leadid) as num
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1, ' GROUP BY ld.leadsource, ld.leadstatus ORDER BY 3 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_bystatus
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_bystatus`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CASE 
+			WHEN ld.leadstatus = '''' THEN ''Không xác định''
+			ELSE ld.leadstatus
+		END ''ld.leadstatus'',
+		
+		COUNT(ld.leadid) as num
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+	
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1, 'GROUP BY ld.leadstatus ORDER BY num DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_bytime
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_bytime`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300),
+	IN `year_` ENUM('Y','N'),
+	IN `month_` ENUM('Y','N'),
+	IN `quarter_` ENUM('Y','N'),
+	IN `day_` ENUM('Y','N')
+
+
+)
+BEGIN
 	DECLARE QUERY1 NVARCHAR(4000);
 	DECLARE QUERY2 NVARCHAR(4000);
 	DECLARE QUERY3 NVARCHAR(4000);
 	DECLARE QUERY4 NVARCHAR(4000);
 	
-	-- Đếm các task theo ngày hoàn thành
-	SET QUERY1_1 = 
-		'(SELECT
-			CONCAT(Day(t.assignedDate),''/'',Month(t.assignedDate),''/'', Year(t.assignedDate)) AS ''date_'',
-			ROUND(SUM(t.estimate)) value,
-			''Ước tính'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
+	CASE
+	WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
 		
-	SET QUERY1_2 = 
-		'(SELECT
-			CONCAT(Day(t.finishedDate),''/'',Month(t.finishedDate),''/'',Year(t.finishedDate) ) AS ''date_'',
-			ROUND(SUM(t.consumed)) value,
-			''Thực hiện'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-	
-	SET QUERY2_1 = 
-		'(SELECT
-			Year(t.assignedDate) AS ''date_'',
-			ROUND(SUM(t.estimate)) value,
-			''Ước tính'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-	
-	SET QUERY2_2 = 
-		'(SELECT
-			Year(t.finishedDate) AS ''date_'',
-			ROUND(SUM(t.consumed)) value,
-			''Thực hiện'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-	
-	SET QUERY3_1 = 
-		'(SELECT
-			CONCAT(Month(t.assignedDate),''/'', Year(t.assignedDate)) AS ''date_'',
-			ROUND(SUM(t.estimate)) value,
-			''Ước tính'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-
-	SET QUERY3_2 = 
-		'(SELECT
-			CONCAT(Month(t.finishedDate),''/'', Year(t.finishedDate)) AS ''date_'',
-			ROUND(SUM(t.consumed)) value,
-			''Thực hiện'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-	
-	SET QUERY4_1 = 
-		'(SELECT
-			CONCAT(Day(t.assignedDate),''/'',Month(t.assignedDate),''/'', Year(t.assignedDate)) AS ''date_'',
-			ROUND(SUM(t.estimate)) value,
-			''Ước tính'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-	
-	SET QUERY4_2 = 
-		'(SELECT
-			CONCAT(Day(t.finishedDate),''/'',Month(t.finishedDate),''/'',Year(t.finishedDate) ) AS ''date_'',
-			ROUND(SUM(t.consumed)) value,
-			''Thực hiện'' type
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND 1=1 ';
-
-	-- Lọc các task có thời gian hoàn thành nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (t.assignedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND (t.assignedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND (t.assignedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND (t.assignedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (t.project = ', project_id,' )');
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND (t.project = ', project_id,' )');
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND (t.project = ', project_id,' )');
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND (t.project = ', project_id,' )');
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (t.project = ', project_id,' )');
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND (t.project = ', project_id,' )');
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND (t.project = ', project_id,' )');
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (t.story = ', story,')');
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND (t.story = ', story,')');
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND (t.story = ', story,')');
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND (t.story = ', story,')');
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (t.story = ', story,')');
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND (t.story = ', story,')');
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND (t.story = ', story,')');
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo dept
-	IF dept IS NOT NULL THEN
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	-- Loc theo story
-	IF col IS NOT NULL AND col = 's.title' THEN 
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-	END IF;
-	
-	-- Loc theo du an
-	IF col IS NOT NULL AND col = 'p.name' THEN 
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-	END IF;
-	
-	-- Loc theo uu tien
-	IF col IS NOT NULL AND col = 't.pri' THEN 
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-	END IF;
 		
-	-- Lọc các task theo col, val
-	IF col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' AND col <>'t.pri' THEN
-		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY2_1 = CONCAT(QUERY2_1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY3_1 = CONCAT(QUERY3_1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY4_1 = CONCAT(QUERY4_1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY2_2 = CONCAT(QUERY2_2,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY3_2 = CONCAT(QUERY3_2,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY4_2 = CONCAT(QUERY4_2,' AND (', col, ' LIKE N\'%', val ,'%\')');
+		SET QUERY1 = 
+			'SELECT
+				CONCAT(Year(c.createdtime), '' - Q'', Quarter(c.createdtime)) AS ''c.createdtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY2 = 
+			'SELECT
+				CAST(Year(c.createdtime) AS CHAR) AS ''c.createdtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY3 = 
+			'SELECT
+				CONCAT(Month(c.createdtime),''/'', Year(c.createdtime)) AS ''c.createdtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY4 = 
+			'SELECT
+				CONCAT(Day(c.createdtime),''/'',Month(c.createdtime),''/'', Year(c.createdtime)) AS ''c.createdtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+				
+	WHEN date_type = 'Ngày chính sửa' THEN
+		
+		SET QUERY1 = 
+			'SELECT
+				CONCAT(Year(c.modifiedtime), '' - Q'', Quarter(c.modifiedtime)) AS ''c.modifiedtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY2 = 
+			'SELECT
+				CAST(Year(c.modifiedtime) AS CHAR) AS ''c.modifiedtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY3 = 
+			'SELECT
+				CONCAT(Month(c.modifiedtime),''/'', Year(c.modifiedtime)) AS ''c.modifiedtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY4 = 
+			'SELECT
+				CONCAT(Day(c.modifiedtime),''/'',Month(c.modifiedtime),''/'', Year(c.modifiedtime)) AS ''c.modifiedtime'',
+				COUNT(ld.leadid) num
+			FROM
+				((((vtiger_leaddetails ld
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = ld.leadid)
+			LEFT JOIN
+				vtiger_leadscf lcf
+			ON
+				ld.leadid = lcf.leadid)
+			LEFT JOIN
+				vtiger_leadaddress la
+			ON
+				la.leadaddressid = ld.leadid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+	END CASE;
+
+	
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY4 = CONCAT(QUERY4,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+				SET QUERY4 = CONCAT(QUERY4,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY4 = CONCAT(QUERY4,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+				SET QUERY4 = CONCAT(QUERY4,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (c.smownerid = ', user_assign_id ,' )');
+		
+	END IF;
+
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (ld.leadstatus = \'', status ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (ld.leadstatus = \'', status ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (ld.leadstatus = \'', status ,'\' )');
 	END IF;
 	
-	SET QUERY1_1 = CONCAT(QUERY1_1, ' GROUP BY date_) ');
-	SET QUERY1_2 = CONCAT(QUERY1_2, ' GROUP BY date_) ');
-	SET QUERY1 = CONCAT(QUERY1_1,' UNION ALL ', QUERY1_2);
-	SET QUERY2_1 = CONCAT(QUERY2_1, ' GROUP BY date_ ) ');
-	SET QUERY2_2 = CONCAT(QUERY2_2, ' GROUP BY date_ ) ');
-	SET QUERY2 = CONCAT(QUERY2_1,' UNION ALL ', QUERY2_2);
-	SET QUERY3_1 = CONCAT(QUERY3_1, ' GROUP BY date_) ');
-	SET QUERY3_2 = CONCAT(QUERY3_2, ' GROUP BY date_) ');
-	SET QUERY3 = CONCAT(QUERY3_1,' UNION ALL ', QUERY3_2);
-	SET QUERY4_1 = CONCAT(QUERY4_1, ' GROUP BY date_) ');
-	SET QUERY4_2 = CONCAT(QUERY4_2, ' GROUP BY date_) ');
-	SET QUERY4 = CONCAT(QUERY4_1,' UNION ALL ', QUERY4_2);
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (ld.leadsource = \'', source ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (ld.leadsource = \'', source ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
 	
-	-- Gộp theo ngày và sắp xếp theo ngày từ h về trước
-	SET QUERY1 = CONCAT(QUERY1,' ORDER BY STR_TO_DATE(date_, ''%d/%m/%Y'') ');
-	SET QUERY2 = CONCAT(QUERY2,' ORDER BY date_ ');
-	SET QUERY3 = CONCAT(QUERY3,' ORDER BY RIGHT(date_,4), CAST(date_ AS UNSIGNED) ');
-	SET QUERY4 = CONCAT(QUERY4,' ORDER BY STR_TO_DATE(date_, ''%d/%m/%Y'') ');
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 		SET QUERY2 = CONCAT(QUERY2,' AND (ld.company = \'', lead1 ,'\' )');
+ 		SET QUERY3 = CONCAT(QUERY3,' AND (ld.company = \'', lead1 ,'\' )');
+ 		SET QUERY4 = CONCAT(QUERY4,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
 	
-	IF year_ IS NULL AND month_ IS NULL AND day_ IS NULL THEN
-		-- In và khởi chạy query
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (la.city = \'', city ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (la.city = \'', city ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (la.city = \'', city ,'\' )');
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY3 = CONCAT(QUERY3,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY4 = CONCAT(QUERY4,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+		SET QUERY2 = CONCAT(QUERY2,' AND (u.user_name IS NULL)');
+		SET QUERY3 = CONCAT(QUERY3,' AND (u.user_name IS NULL)');
+		SET QUERY4 = CONCAT(QUERY4,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (',col,' = '''' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (',col,' = '''' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	
+	SET QUERY2 = CONCAT(QUERY2,'GROUP BY 1 ORDER BY 1');
+	
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY Year(c.createdtime), Quarter(c.createdtime)');
+			SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(c.createdtime), Month(c.createdtime)');
+			SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(c.createdtime), Month(c.createdtime), Day(c.createdtime)');
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY Year(c.modifiedtime), Quarter(c.modifiedtime)');
+			SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(c.modifiedtime), Month(c.modifiedtime)');
+			SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(c.modifiedtime), Month(c.modifiedtime), Day(c.modifiedtime)');
+	END CASE;
+	
+	IF day_ IS NOT NULL OR (day_ IS NULL AND month_ IS NULL AND quarter_ IS NULL AND year_ IS NULL) THEN
+		
+		
+		SET @SQL := QUERY4;
+		PREPARE stmt4 FROM @SQL;
+		EXECUTE stmt4;
+		DEALLOCATE PREPARE stmt4;
+	END IF;
+	
+	IF month_ IS NOT NULL THEN
+		
+		 SELECT QUERY3;
+		SET @SQL := QUERY3;
+		PREPARE stmt3 FROM @SQL;
+		EXECUTE stmt3;
+		DEALLOCATE PREPARE stmt3;
+	END IF;
+	
+	IF quarter_ IS NOT NULL THEN
+		
+		
+		SET @SQL := QUERY1;
+		PREPARE stmt FROM @SQL;
+		EXECUTE stmt;
+		DEALLOCATE PREPARE stmt;
+	END IF;	
+	
+	IF year_ IS NOT NULL THEN
+		
+		
+		SET @SQL := QUERY2;
+		PREPARE stmt2 FROM @SQL;
+		EXECUTE stmt2;
+		DEALLOCATE PREPARE stmt2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_num_lead_byuser
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_num_lead_byuser`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CASE 
+			WHEN u.user_name IS NULL THEN ''Không xác định''
+			ELSE u.user_name
+		END ''u.user_name'',
+		
+		COUNT(ld.leadid) as num
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND u.status=''Active'' AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+	
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1, 'GROUP BY 1 ORDER BY 2 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_total_city
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_total_city`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		COUNT(DISTINCT la.city) as total_city
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND 1=1 AND la.city <> ''''';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+	
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_total_industry
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_total_industry`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		COUNT(DISTINCT ld.industry) as total_industry
+	FROM
+		((((vtiger_leaddetails ld
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = ld.leadid)
+	LEFT JOIN
+		vtiger_leadscf lcf
+	ON
+		ld.leadid = lcf.leadid)
+	LEFT JOIN
+		vtiger_leadaddress la
+	ON
+		la.leadaddressid = ld.leadid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+   WHERE 
+		c.deleted <> 1 AND ld.industry <> '''' AND 1=1 ';
+   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+	
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_lead_total_lead
+DELIMITER //
+CREATE PROCEDURE `dsa_lead_total_lead`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `status` VARCHAR(50),
+	IN `source` VARCHAR(50),
+	IN `lead1` VARCHAR(100),
+	IN `dept` INT,
+	IN `city` VARCHAR(50),
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+		'SELECT
+			COUNT(ld.leadid) as total_lead
+		FROM
+			((((vtiger_leaddetails ld
+		INNER JOIN
+			vtiger_crmentity c
+		ON
+			c.crmid = ld.leadid)
+		LEFT JOIN
+			vtiger_leadscf lcf
+		ON
+			ld.leadid = lcf.leadid)
+		LEFT JOIN
+			vtiger_leadaddress la
+		ON
+			la.leadaddressid = ld.leadid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+	   WHERE 
+			c.deleted <> 1 AND 1=1 ';
+		
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadstatus = \'', status ,'\' )');
+	END IF;
+	
+	IF source IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (ld.leadsource = \'', source ,'\' )');
+	END IF;
+	
+	 IF lead1 IS NOT NULL THEN 
+ 		SET QUERY1 = CONCAT(QUERY1,' AND (ld.company = \'', lead1 ,'\' )');
+ 	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+	
+	IF city IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (la.city = \'', city ,'\' )');
+	END IF;
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'la.city' OR col = 'ld.industry' OR col = 'ld.leadstatus' OR col = 'ld.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_activity_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_activity_detail`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `start_day_type` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+
+
+
+
+
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CONCAT(''['',a.subject, '' ('',a.activityid, '')'', '']'',''(http://uatcrm.fastdn.com.vn/index.php?module=Calendar&view=Detail&record='',p.potentialid,''&&mode=showDetailViewByMode&requestMode=full&tab_label=Sự%20kiện%20Chi%20tiết&app=MARKETING)'') ''a.subject'',
+		a.activitytype,
+		CASE 
+			WHEN u.user_name IS NULL THEN ''Không xác định''
+			WHEN u.user_name = '''' THEN ''Trống''
+			ELSE u.user_name
+		END ''u.user_name'', 
+		a.date_start,
+		LEFT(a.time_start, 5) ''time_start'',
+		a.due_date,
+		LEFT(a.time_end, 5) ''time_end'',
+		CASE 
+			WHEN a.status=''In Progress'' THEN ''Đang xử lý''
+			WHEN a.status=''Completed'' OR a.status=''Hoàn thành'' THEN ''Đã hoàn thành''
+			WHEN a.status=''Pending Input'' THEN ''Đang chờ xử lý''
+			WHEN a.status=''Deferred'' THEN ''Trì hoãn''
+			WHEN a.status=''Planned'' THEN ''Đã lên kế hoạch''
+			WHEN a.eventstatus=''Planned''THEN ''Lên kế hoạch''
+			WHEN a.eventstatus=''Held'' OR a.eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+			WHEN a.eventstatus=''Not Held'' THEN ''Không tổ chức''
+			ELSE ''Không xác định'' END AS ''a.status''
+		FROM
+			(((((((vtiger_potential p
+		INNER JOIN
+			vtiger_crmentity c
+		ON
+			c.crmid = p.potentialid)
+		LEFT JOIN
+			vtiger_potentialscf pcf
+		ON
+			p.potentialid = pcf.potentialid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+		LEFT JOIN
+			vtiger_seproductsrel pse
+		ON
+			pse.crmid = c.crmid)
+		LEFT JOIN
+			vtiger_products pr
+		ON
+			pr.productid = pse.productid)
+		INNER JOIN
+			vtiger_seactivityrel s
+		ON
+			s.crmid = c.crmid)
+		INNER JOIN
+			vtiger_activity a
+		ON
+			a.activityid = s.activityid)
+		WHERE 
+			c.deleted <> 1 AND a.due_date <> ''4031-02-23 00:00:00'' AND 1=1';
+	
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (a.date_start BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (a.date_start BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN 
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (a.date_start BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )');
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+	END CASE;
+	
+	CASE
+		WHEN start_day_type = 0 OR start_day_type IS NULL THEN
+			SET QUERY1 = CONCAT(QUERY1,' ');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (a.date_start = CURDATE() )');
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1,' ORDER BY c.createdtime DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_all
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_all`(
+	IN `id_proc` VARCHAR(35),
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `start_prob` DOUBLE,
+	IN `end_prob` DOUBLE,
+	IN `start_prob2` INT,
+	IN `end_prob2` INT,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `days_delay` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300),
+	IN `year_` ENUM('Y','N'),
+	IN `month_` ENUM('Y','N'),
+	IN `day_` ENUM('Y','N'),
+	IN `quarter_` ENUM('Y','N')
+
+
+)
+BEGIN
+	IF user_mkt = 'Không xác định' THEN SET user_mkt = ''; END IF;
+	IF user_service = 'Không xác định' THEN  SET user_service = ''; END IF;
+	IF status = 'Không xác định' THEN  SET status = ''; END IF;
+	IF status = 'Trống' THEN  SET status = NULL; END IF;
+	
+	IF id_proc = 'total_potential' THEN
+		CALL `dsa_potential_total_potential` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'total_potential_won' THEN
+		CALL `dsa_potential_total_potential_won` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'total_potential_lost' THEN
+		CALL `dsa_potential_total_potential_lost` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'total_potential_sale' THEN
+		CALL `dsa_potential_total_potential_sale` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'num_potential_bytime' THEN
+		CALL `dsa_potential_bytime` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val, year_, month_, day_, quarter_);
+	END IF;
+	
+	IF id_proc = 'potential_delay' THEN
+		CALL `dsa_potential_delay` (user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, days_delay, col, val);
+	END IF;
+	
+	IF id_proc = 'potential_delay_2' THEN
+		CALL `dsa_potential_delay_2` (user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, start_prob, end_prob, start_prob2, end_prob2, col, val);
+	END IF;
+	
+	IF id_proc = 'num_potential_bysalestage' THEN
+		CALL `dsa_potential_bysalestage` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'num_potential_byproduct' THEN
+		CALL `dsa_potential_byproduct` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'num_potential_byuser' THEN
+		CALL `dsa_potential_byuser` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val, year_, month_, day_);
+	END IF;
+	
+	IF id_proc = 'num_potential_byuser_status' THEN
+		CALL `dsa_potential_by_user_status` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val, year_, month_, day_);
+	END IF;
+	
+	IF id_proc = 'potential_detail' THEN
+		CALL `dsa_potential_detail` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, start_prob, end_prob, col, val);
+	END IF;
+	
+	IF id_proc = 'comment_detail' THEN
+		CALL `dsa_potential_comment_detail` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, col, val);
+	END IF;
+	
+	IF id_proc = 'activity_detail' THEN
+		CALL `dsa_potential_activity_detail` (date_type,start_date, end_date, user_assign_id, user_service, user_mkt, status, sales_stage, potential, dept, product, days_delay, col, val);
+	END IF;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_byproduct
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_byproduct`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CASE 
+			WHEN pr.productname IS NULL THEN ''Không xác định ()''
+			ELSE pr.productname
+		END ''pr.productname'',
+		
+		COUNT(DISTINCT p.potentialid) ''num''
+	FROM
+		((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND 1=1 ';
+	
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;	
+		
+		WHEN date_type = 'Ngày đóng' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1,' 	GROUP BY 1 ORDER BY 2 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_bysalestage
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_bysalestage`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CASE 
+			WHEN p.sales_stage IS NULL THEN ''Không xác định''
+			ELSE p.sales_stage
+		END ''p.sales_stage'',
+		
+		COUNT(DISTINCT p.potentialid) ''num''
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND 1=1 ';
+		
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1,' 	GROUP BY 1 ORDER BY 2 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_bytime
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_bytime`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300),
+	IN `year_` ENUM('Y','N'),
+	IN `month_` ENUM('Y','N'),
+	IN `day_` ENUM('Y','N'),
+	IN `quarter_` ENUM('Y','N')
+)
+BEGIN
+	DECLARE QUERY1 NVARCHAR(4000);
+	DECLARE QUERY2 NVARCHAR(4000);
+	DECLARE QUERY3 NVARCHAR(4000);
+	DECLARE QUERY4 NVARCHAR(4000);
+	
+	CASE
+	WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+		
+		
+		SET QUERY1 = 
+			'SELECT
+				CONCAT(Year(c.createdtime), '' - Q'', Quarter(c.createdtime)) AS ''c.createdtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY2 = 
+			'SELECT
+				CAST(Year(c.createdtime) AS CHAR) AS ''c.createdtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY3 = 
+			'SELECT
+				CONCAT(Month(c.createdtime),''/'', Year(c.createdtime)) AS ''c.createdtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY4 = 
+			'SELECT
+				CONCAT(Day(c.createdtime),''/'',Month(c.createdtime),''/'', Year(c.createdtime)) AS ''c.createdtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+
+	WHEN date_type = 'Ngày chỉnh sửa' THEN
+		
+		SET QUERY1 = 
+			'SELECT
+				CONCAT(Year(c.modifiedtime), '' - Q'', Quarter(c.modifiedtime)) AS ''c.modifiedtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY2 = 
+			'SELECT
+				CAST(Year(c.modifiedtime) AS CHAR) AS ''c.modifiedtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY3 = 
+			'SELECT
+				CONCAT(Month(c.modifiedtime),''/'', Year(c.modifiedtime)) AS ''c.modifiedtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY4 = 
+			'SELECT
+				CONCAT(Day(c.modifiedtime),''/'',Month(c.modifiedtime),''/'', Year(c.modifiedtime)) AS ''c.modifiedtime'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+				
+	WHEN date_type = 'Ngày đóng' THEN
+		
+		SET QUERY1 = 
+			'SELECT
+				CONCAT(Year(p.closingdate), '' - Q'', Quarter(p.closingdate)) AS ''p.closingdate'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY2 = 
+			'SELECT
+				CAST(Year(p.closingdate) AS CHAR) AS ''p.closingdate'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY3 = 
+			'SELECT
+				CONCAT(Month(p.closingdate),''/'', Year(p.closingdate)) AS ''p.closingdate'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+		
+		SET QUERY4 = 
+			'SELECT
+				CONCAT(Day(p.closingdate),''/'',Month(p.closingdate),''/'', Year(p.closingdate)) AS ''p.closingdate'',
+				COUNT(DISTINCT p.potentialid) num
+			FROM
+				(((((vtiger_potential p
+			INNER JOIN
+				vtiger_crmentity c
+			ON
+				c.crmid = p.potentialid)
+			LEFT JOIN
+				vtiger_potentialscf pcf
+			ON
+				p.potentialid = pcf.potentialid)
+			LEFT JOIN
+				vtiger_users u
+			ON
+				c.smownerid = u.id)
+			LEFT JOIN
+				vtiger_seproductsrel pse
+			ON
+				pse.crmid = c.crmid)
+			LEFT JOIN
+				vtiger_products pr
+			ON
+				pr.productid = pse.productid)
+		   WHERE 
+				c.deleted <> 1 AND 1=1 ';
+	END CASE;
+
+	
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY4 = CONCAT(QUERY4,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+				SET QUERY4 = CONCAT(QUERY4,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.modifiedtime BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (c.modifiedtime BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+				SET QUERY4 = CONCAT(QUERY4,' AND (c.modifiedtime BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+				SET QUERY4 = CONCAT(QUERY4,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (p.closingdate BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (p.closingdate BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+				SET QUERY4 = CONCAT(QUERY4,' AND (p.closingdate BETWEEN \'',start_date,'\'  ',' AND  \'', end_date,'\'  )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+				SET QUERY4 = CONCAT(QUERY4,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (c.smownerid = ', user_assign_id ,' )');
+		
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_901 = '''' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_901 = '''' )');
+			SET QUERY4 = CONCAT(QUERY4,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY4 = CONCAT(QUERY4,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_985 = '''' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_985 = '''' )');
+			SET QUERY4 = CONCAT(QUERY4,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY4 = CONCAT(QUERY4,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pr.productid IS NULL )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pr.productid IS NULL )');
+			SET QUERY4 = CONCAT(QUERY4,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pr.productid = ', product ,' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pr.productid = ', product ,' )');
+			SET QUERY4 = CONCAT(QUERY4,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY3 = CONCAT(QUERY3,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY4 = CONCAT(QUERY4,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+		SET QUERY2 = CONCAT(QUERY2,' AND (u.user_name IS NULL)');
+		SET QUERY3 = CONCAT(QUERY3,' AND (u.user_name IS NULL)');
+		SET QUERY4 = CONCAT(QUERY4,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (',col,' = '''' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (',col,' = '''' )');
+		SET QUERY4 = CONCAT(QUERY4,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	
+	SET QUERY2 = CONCAT(QUERY2,'GROUP BY 1 ORDER BY 1');
+	
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY Year(c.createdtime), QUARTER(c.createdtime)');
+			SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(c.createdtime), Month(c.createdtime)');
+			SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(c.createdtime), Month(c.createdtime), Day(c.createdtime)');
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY Year(c.modifiedtime), QUARTER(c.modifiedtime)');
+			SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(c.modifiedtime), Month(c.modifiedtime)');
+			SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(c.modifiedtime), Month(c.modifiedtime), Day(c.modifiedtime)');
+		
+		WHEN date_type = 'Ngày đóng' THEN
+			SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY Year(p.closingdate), QUARTER(p.closingdate)');
+			SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(p.closingdate), Month(p.closingdate)');
+			SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(p.closingdate), Month(p.closingdate), Day(p.closingdate)');
+	END CASE;
+	
+	IF quarter_ IS NOT NULL THEN
+		
 		SELECT QUERY1;
 		SET @SQL := QUERY1;
 		PREPARE stmt FROM @SQL;
@@ -1662,7 +6037,7 @@ BEGIN
 	END IF;
 	
 	IF year_ IS NOT NULL THEN
-		-- In và khởi chạy query
+		
 		SELECT QUERY2;
 		SET @SQL := QUERY2;
 		PREPARE stmt2 FROM @SQL;
@@ -1671,7 +6046,7 @@ BEGIN
 	END IF;
 	
 	IF month_ IS NOT NULL THEN
-		-- In và khởi chạy query
+		
 		SELECT QUERY3;
 		SET @SQL := QUERY3;
 		PREPARE stmt3 FROM @SQL;
@@ -1680,7 +6055,7 @@ BEGIN
 	END IF;
 	
 	IF day_ IS NOT NULL THEN
-		-- In và khởi chạy query
+		
 		SELECT QUERY4;
 		SET @SQL := QUERY4;
 		PREPARE stmt4 FROM @SQL;
@@ -1690,2273 +6065,4694 @@ BEGIN
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_task_num_hour_bytime
+-- Dumping structure for procedure crm.dsa_potential_byuser
 DELIMITER //
-CREATE PROCEDURE `dsa_task_num_hour_bytime`(
+CREATE PROCEDURE `dsa_potential_byuser`(
+	IN `date_type` VARCHAR(50),
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
 	IN `dept` INT,
+	IN `product` INT,
 	IN `col` VARCHAR(300),
 	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
+	IN `assign` ENUM('Y','N'),
+	IN `mkt` ENUM('Y','N'),
+	IN `service` ENUM('Y','N')
+)
+BEGIN
+	DECLARE QUERY1 NVARCHAR(4000);
+	DECLARE QUERY1_1 NVARCHAR(4000);
+	DECLARE QUERY1_2 NVARCHAR(4000);
+	DECLARE QUERY2 NVARCHAR(4000);
+	DECLARE QUERY2_1 NVARCHAR(4000);
+	DECLARE QUERY2_2 NVARCHAR(4000);
+	DECLARE QUERY3 NVARCHAR(4000);
+	DECLARE QUERY3_1 NVARCHAR(4000);
+	DECLARE QUERY3_2 NVARCHAR(4000);
+	
+	SET QUERY1_1 = 
+		'(SELECT
+			CASE 
+				WHEN u.user_name IS NULL THEN ''Không xác định''
+				WHEN u.user_name = '''' THEN ''Trống''
+				ELSE u.user_name
+			END ''user_name'',
+				
+			COUNT(DISTINCT p.potentialid) ''num''
+		FROM
+			(((((vtiger_potential p
+		INNER JOIN
+			vtiger_crmentity c
+		ON
+			c.crmid = p.potentialid)
+		LEFT JOIN
+			vtiger_potentialscf pcf
+		ON
+			p.potentialid = pcf.potentialid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+		LEFT JOIN
+			vtiger_seproductsrel pse
+		ON
+			pse.crmid = c.crmid)
+		LEFT JOIN
+			vtiger_products pr
+		ON
+			pr.productid = pse.productid)
+		WHERE 
+			c.deleted <> 1 AND 1=1 ';
+	
+	SET QUERY1_2 = 
+		'(SELECT
+			CASE 
+				WHEN u.user_name IS NULL THEN ''Không xác định''
+				WHEN u.user_name = '''' THEN ''Trống''
+				ELSE u.user_name
+			END ''user_name'',
+				
+			COUNT(DISTINCT p.potentialid) ''num''
+		FROM
+			(((((vtiger_potential p
+		INNER JOIN
+			vtiger_crmentity c
+		ON
+			c.crmid = p.potentialid)
+		LEFT JOIN
+			vtiger_potentialscf pcf
+		ON
+			p.potentialid = pcf.potentialid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+		LEFT JOIN
+			vtiger_seproductsrel pse
+		ON
+			pse.crmid = c.crmid)
+		LEFT JOIN
+			vtiger_products pr
+		ON
+			pr.productid = pse.productid)
+		WHERE 
+			c.deleted <> 1 AND p.sales_stage=''Closed Won'' AND 1=1 ';
+	
+	
+	
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1_1 = CONCAT(QUERY1_1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY1_2 = CONCAT(QUERY1_2,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1_1 = CONCAT(QUERY1_1,' ');
+				SET QUERY1_2 = CONCAT(QUERY1_2,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1_1 = CONCAT(QUERY1_1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY1_2 = CONCAT(QUERY1_2,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1_1 = CONCAT(QUERY1_1,' ');
+				SET QUERY1_2 = CONCAT(QUERY1_2,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1_1 = CONCAT(QUERY1_1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY1_2 = CONCAT(QUERY1_2,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1_1 = CONCAT(QUERY1_1,' ');
+				SET QUERY1_2 = CONCAT(QUERY1_2,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (c.smownerid = ', user_assign_id ,' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pcf.cf_901 = '''' )');
+			SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pcf.cf_985 = '''' )');
+			SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pr.productid IS NULL )');
+			SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1_1 = CONCAT(QUERY1_1,' AND (pr.productid = ', product ,' )');
+			SET QUERY1_2 = CONCAT(QUERY1_2,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (u.user_name IS NULL)');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1_1 = CONCAT(QUERY1_1,' AND (',col,' = '''' )');
+		SET QUERY1_2 = CONCAT(QUERY1_2,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SET QUERY1_1 = CONCAT(QUERY1_1,'GROUP BY 1 ORDER BY 2 DESC)');
+	SET QUERY1_2 = CONCAT(QUERY1_2,'GROUP BY 1 ORDER BY 2 DESC)');
+
+	SET QUERY1 = CONCAT('SELECT t1.`user_name` as ''u.user_name'', CONCAT(ROUND(t2.num/t1.num * 100, 2), ''%'') num, t1.num total FROM ',QUERY1_1,' t1 LEFT JOIN ',QUERY1_2,' t2 ON t1.`user_name` = t2.`user_name` WHERE ROUND(t2.num/t1.num * 100, 2) IS NOT NULL ORDER BY t1.num DESC');
+
+	
+	IF assign IS NOT NULL THEN
+		
+		SELECT QUERY1;
+		SET @SQL := QUERY1;
+		PREPARE stmt1 FROM @SQL;
+		EXECUTE stmt1;
+		DEALLOCATE PREPARE stmt1;
+	END IF;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_by_user_status
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_by_user_status`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300),
+	IN `assign` ENUM('Y','N'),
+	IN `mkt` ENUM('Y','N'),
+	IN `service` ENUM('Y','N')
 )
 BEGIN
 	DECLARE QUERY1 NVARCHAR(4000);
 	DECLARE QUERY2 NVARCHAR(4000);
 	DECLARE QUERY3 NVARCHAR(4000);
-	DECLARE QUERY4 NVARCHAR(4000);
 	
-	-- Đếm các task theo ngày hoàn thành
 	SET QUERY1 = 
 		'SELECT
-			DATE(t.finishedDate) AS ''time'',
-			SUM(t.consumed) num
+			CASE 
+				WHEN u.user_name IS NULL THEN ''Không xác định''
+				WHEN u.user_name = '''' THEN ''Trống''
+				ELSE u.user_name
+			END ''u.user_name'',
+			
+			CASE 
+				WHEN p.sales_stage IS NULL THEN ''Không xác định''
+				WHEN p.sales_stage = '''' THEN ''Trống''
+				ELSE p.sales_stage
+			END ''p.sales_stage'',
+				
+			COUNT(DISTINCT p.potentialid) ''num''
 		FROM
-			zt_task t
+			(((((vtiger_potential p
 		INNER JOIN
-			zt_project p
+			vtiger_crmentity c
 		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND t.status IN  (''done'', ''closed'') AND 1=1 ';
+			c.crmid = p.potentialid)
+		LEFT JOIN
+			vtiger_potentialscf pcf
+		ON
+			p.potentialid = pcf.potentialid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+		LEFT JOIN
+			vtiger_seproductsrel pse
+		ON
+			pse.crmid = c.crmid)
+		LEFT JOIN
+			vtiger_products pr
+		ON
+			pr.productid = pse.productid)
+		WHERE 
+			c.deleted <> 1 AND 1=1 ';
 	
 	SET QUERY2 = 
 		'SELECT
-			CAST(Year(t.finishedDate) AS CHAR) AS ''time'',
-			SUM(t.consumed) num
+			CASE 
+				WHEN pcf.cf_985 = '''' THEN ''Không xác định''
+				WHEN pcf.cf_985 = '''' THEN ''Trống''
+				ELSE pcf.cf_985
+			END ''pcf.cf_985'',
+			
+			CASE 
+				WHEN p.sales_stage IS NULL THEN ''Không xác định''
+				WHEN p.sales_stage = '''' THEN ''Trống''
+				ELSE p.sales_stage
+			END ''p.sales_stage'',
+			
+			COUNT(DISTINCT p.potentialid) ''num''
 		FROM
-			zt_task t
+			(((((vtiger_potential p
 		INNER JOIN
-			zt_project p
+			vtiger_crmentity c
 		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND t.status IN  (''done'', ''closed'') AND 1=1 ';
+			c.crmid = p.potentialid)
+		LEFT JOIN
+			vtiger_potentialscf pcf
+		ON
+			p.potentialid = pcf.potentialid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+		LEFT JOIN
+			vtiger_seproductsrel pse
+		ON
+			pse.crmid = c.crmid)
+		LEFT JOIN
+			vtiger_products pr
+		ON
+			pr.productid = pse.productid)
+		WHERE 
+			c.deleted <> 1 AND 1=1 ';
 	
 	SET QUERY3 = 
 		'SELECT
-			CONCAT(Month(t.finishedDate),''/'', Year(t.finishedDate)) AS ''time'',
-			SUM(t.consumed) num
+			CASE 
+				WHEN pcf.cf_901 = '''' THEN ''Không xác định''
+				WHEN pcf.cf_901 = '''' THEN ''Trống''
+				ELSE pcf.cf_901
+			END ''pcf.cf_901'',
+			
+			CASE 
+				WHEN p.sales_stage IS NULL THEN ''Không xác định''
+				WHEN p.sales_stage = '''' THEN ''Trống''
+				ELSE p.sales_stage
+			END ''p.sales_stage'',
+			
+			COUNT(DISTINCT p.potentialid) ''num''
 		FROM
-			zt_task t
+			(((((vtiger_potential p
 		INNER JOIN
-			zt_project p
+			vtiger_crmentity c
 		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND t.status IN  (''done'', ''closed'') AND 1=1 ';
-	
-	SET QUERY4 = 
-		'SELECT
-			CONCAT(Day(t.finishedDate),''/'',Month(t.finishedDate),''/'', Year(t.finishedDate)) AS ''time'',
-			SUM(t.consumed) num
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
+			c.crmid = p.potentialid)
+		LEFT JOIN
+			vtiger_potentialscf pcf
 		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent <> -1 AND t.status IN  (''done'', ''closed'') AND 1=1 ';
+			p.potentialid = pcf.potentialid)
+		LEFT JOIN
+			vtiger_users u
+		ON
+			c.smownerid = u.id)
+		LEFT JOIN
+			vtiger_seproductsrel pse
+		ON
+			pse.crmid = c.crmid)
+		LEFT JOIN
+			vtiger_products pr
+		ON
+			pr.productid = pse.productid)
+		WHERE 
+			c.deleted <> 1 AND 1=1 ';
 
-	-- Lọc các task có thời gian hoàn thành nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
 	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.project = ', project_id,' )');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.project = ', project_id,' )');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedBy = \'', username ,'\' )');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.finishedBy = \'', username ,'\' )');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.finishedBy = \'', username ,'\' )');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.finishedBy = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo mức độ ưu tiên
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.story = ', story,')');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.story = ', story,')');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo dept
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedBy IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.finishedBy IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.finishedBy IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.finishedBy IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	-- Loc theo story
-	IF col IS NOT NULL AND col = 's.title' THEN 
-		SET QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2 = CONCAT(QUERY2,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3 = CONCAT(QUERY3,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4 = CONCAT(QUERY4,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-	END IF;
-	
-	-- Loc theo du an
-	IF col IS NOT NULL AND col = 'p.name' THEN 
-		SET QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2 = CONCAT(QUERY2,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3 = CONCAT(QUERY3,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4 = CONCAT(QUERY4,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-	END IF;
-	
-	-- Loc theo uu tien
-	IF col IS NOT NULL AND col = 't.pri' THEN 
-		SET QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY2 = CONCAT(QUERY2,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY3 = CONCAT(QUERY3,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		SET QUERY4 = CONCAT(QUERY4,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-	END IF;
+	CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+			END IF;
 		
-	-- Lọc các task theo col, val
-	IF col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' AND col <>'t.pri' THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY3 = CONCAT(QUERY3,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY4 = CONCAT(QUERY4,' AND (', col, ' LIKE N\'%', val ,'%\')');
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY3 = CONCAT(QUERY3,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+				SET QUERY3 = CONCAT(QUERY3,' ');
+			END IF;
+			
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = ', user_assign_id ,' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (c.smownerid = ', user_assign_id ,' )');
+		
 	END IF;
 	
-	-- Gộp theo ngày và sắp xếp theo ngày từ h về trước
-	SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY 1');
-	SET QUERY2 = CONCAT(QUERY2,'GROUP BY 1 ORDER BY 1');
-	SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(t.finishedDate), Month(t.finishedDate)');
-	SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(t.finishedDate), Month(t.finishedDate), Day(t.finishedDate)');
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_901 = '''' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
 	
-	IF year_ IS NULL AND month_ IS NULL AND day_ IS NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY1;
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_985 = '''' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = \'', dept ,'\' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (c.smownerid = \'', dept ,'\' )');
+	END IF;
+
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pr.productid IS NULL )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pr.productid = ', product ,' )');
+			SET QUERY3 = CONCAT(QUERY3,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY3 = CONCAT(QUERY3,' AND (', col, ' = N\'', val ,'\')');
+	END IF;
+	
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+		SET QUERY2 = CONCAT(QUERY2,' AND (u.user_name IS NULL)');
+		SET QUERY3 = CONCAT(QUERY3,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (',col,' = '''' )');
+		SET QUERY3 = CONCAT(QUERY3,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1,2 ORDER BY 3 DESC');
+	SET QUERY2 = CONCAT(QUERY2,'GROUP BY 1,2 ORDER BY 3 DESC');
+	SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1,2 ORDER BY 3 DESC');
+
+	
+	IF assign IS NOT NULL THEN
+		
+		
 		SET @SQL := QUERY1;
-		PREPARE stmt FROM @SQL;
-		EXECUTE stmt;
-		DEALLOCATE PREPARE stmt;
+		PREPARE stmt1 FROM @SQL;
+		EXECUTE stmt1;
+		DEALLOCATE PREPARE stmt1;
 	END IF;
 	
-	IF year_ IS NOT NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY2;
+	IF mkt IS NOT NULL THEN
+		
+		
 		SET @SQL := QUERY2;
 		PREPARE stmt2 FROM @SQL;
 		EXECUTE stmt2;
 		DEALLOCATE PREPARE stmt2;
 	END IF;
 	
-	IF month_ IS NOT NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY3;
+	IF service IS NOT NULL THEN
+		
+		SELECT QUERY3;
 		SET @SQL := QUERY3;
 		PREPARE stmt3 FROM @SQL;
 		EXECUTE stmt3;
 		DEALLOCATE PREPARE stmt3;
 	END IF;
 	
-	IF day_ IS NOT NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY4;
-		SET @SQL := QUERY4;
-		PREPARE stmt4 FROM @SQL;
-		EXECUTE stmt4;
-		DEALLOCATE PREPARE stmt4;
-	END IF;
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_task_num_pri
+-- Dumping structure for procedure crm.dsa_potential_comment_detail
 DELIMITER //
-CREATE PROCEDURE `dsa_task_num_pri`(
+CREATE PROCEDURE `dsa_potential_comment_detail`(
+	IN `date_type` VARCHAR(50),
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
 	IN `dept` INT,
+	IN `product` INT,
 	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
+	IN `val` VARCHAR(300)
+
+
+
 )
 BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
 	
-	-- Đếm các task theo độ ưu tiên
-	SET QUERY1 = 
-	'SELECT 
-		COUNT(t.id) as ''number'',
-		CASE
-			WHEN t.pri = 1 THEN ''Ưu tiên 1''
-			WHEN t.pri = 2 THEN ''Ưu tiên 2''
-			WHEN t.pri = 3 THEN ''Ưu tiên 3''
-			WHEN t.pri = 4 THEN ''Ưu tiên 4''
-		END as ''t.pri''
-	FROM
-		zt_task t
-	INNER JOIN
-		zt_project p
-	ON
-		p.id = t.project
-	WHERE 1=1 ';
-	
-	-- Lọc ra các task chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, ' AND t.pri <> 0 AND t.deleted <>''1'' AND p.deleted <>''1''');
-	
-	-- Lọc các task có thời gian tạo nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = \'', story ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-	
-	-- Gộp nhóm theo loại trạng thái và sắp xếp số lượng task giảm dần
-	SET QUERY1  = CONCAT(QUERY1, ' GROUP BY t.pri');
-	
-	-- In và khởi chạy query
-	-- SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt4 FROM @SQL;
-	EXECUTE stmt4;
-	DEALLOCATE PREPARE stmt4;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_num_task_byproject
-DELIMITER //
-CREATE PROCEDURE `dsa_task_num_task_byproject`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
-	
-	-- Đếm số task trong mỗi project và hiển thị tên project đó
-	SET QUERY1 = 
-		'SELECT
-			p.name as ''p.name'',
-			COUNT(t.id) num_task
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE 1=1 ';
-
-	-- Lọc các task và dự án chưa xóa
-	SET QUERY1 = CONCAT(QUERY1, 'AND p.deleted <> ''1'' AND t.deleted <> ''1''');
-
-	-- Lọc các project có thời gian tạo nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-		
-	-- Nhóm theo project và sắp xếp theo số lượng task giảm dần
-	SET QUERY1  = CONCAT(QUERY1, ' GROUP BY p.name ORDER BY num_task DESC');
-	
-	-- In và khởi chạy query
-	-- SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_num_task_bystory
-DELIMITER //
-CREATE PROCEDURE `dsa_task_num_task_bystory`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	-- Đếm các task đã tạo theo story
-	DECLARE QUERY1 NVARCHAR(4000);
-	SET QUERY1 = 
-		'SELECT 
-			s.title as ''s.title'',
-			COUNT(t.id) as num_task 
-		 FROM 
-		 	((zt_task t 
-		 INNER JOIN 
-		 	zt_story s ON t.story = s.id)
-		 INNER JOIN 
-		 	zt_project p ON p.id = t.project)
-		 WHERE 1=1 ';
-		 
-	-- Lọc các task, project, story chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, ' AND s.deleted <>''1'' AND t.deleted <>''1'' AND p.deleted <>''1''');
-	
-	-- Lọc các task có thời gian mở nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo mức độ ưu tiên
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 't.finishedDate' AND col <> 't.openedDate' AND col <> 'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-	
-	SET QUERY1 = CONCAT(QUERY1,' GROUP BY 1 ORDER BY 2 DESC');
-	
-	-- In và khởi chạy query
-	-- SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_num_task_bytime
-DELIMITER //
-CREATE PROCEDURE `dsa_task_num_task_bytime`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
 	DECLARE QUERY1 NVARCHAR(4000);
 	DECLARE QUERY2 NVARCHAR(4000);
-	DECLARE QUERY3 NVARCHAR(4000);
-	DECLARE QUERY4 NVARCHAR(4000);
+	DECLARE QUERY NVARCHAR(4000);
 	
-	-- Đếm các task đã mở theo ngày
 	SET QUERY1 = 
-		'SELECT
-			DATE(t.openedDate) AS ''t.openedDate'',
-			COUNT(t.id) num
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent<>-1 AND 1=1 ';
+	'(SELECT
+		CONCAT(''['',p.potentialname , '' ('',p.potential_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Potentials&view=Detail&record='',p.potentialid,''&app=SALES)'') ''company'',
+		CASE 
+			WHEN u.user_name IS NULL THEN ''Không xác định''
+			WHEN u.user_name = '''' THEN ''Trống''
+			ELSE u.user_name
+		END ''u.user_name'', 
+		m.modcommentsid id,
+		CONCAT(u.last_name, '' '', u.first_name) name,
+		m.commentcontent content,
+		c.createdtime time
+	FROM
+		((((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	INNER JOIN
+		vtiger_modcomments m
+	ON
+		m.related_to = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		m.parent_comments = 0 AND c.deleted = 0 AND 1=1 ';
 	
 	SET QUERY2 = 
-		'SELECT
-			CAST(Year(t.openedDate) AS CHAR) AS ''t.openedDate'',
-			COUNT(t.id) num
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent<>-1 AND 1=1 ';
-	
-	SET QUERY3 = 
-		'SELECT
-			CONCAT(Month(t.openedDate),''/'', Year(t.openedDate)) AS ''t.openedDate'',
-			COUNT(t.id) num
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent<>-1 AND 1=1 ';
-	
-	SET QUERY4 = 
-		'SELECT
-			CONCAT(Day(t.openedDate),''/'',Month(t.openedDate),''/'', Year(t.openedDate)) AS ''t.openedDate'',
-			COUNT(t.id) num
-		FROM
-			zt_task t
-		INNER JOIN
-			zt_project p
-		ON
-			t.project = p.id
-		WHERE t.deleted <> ''1'' AND p.deleted <> ''1'' AND t.parent<>-1 AND 1=1 ';
-
-	-- Lọc các task có thời gian hoàn thành nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.openedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.project = ', project_id,' )');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.project = ', project_id,' )');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.assignedTo = \'', username ,'\' )');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.story = ', story,')');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.story = ', story,')');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo dept
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	-- col, val
-	-- Loc theo story
-	IF col IS NOT NULL AND col = 's.title' THEN 
-		SET QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY2 = CONCAT(QUERY2,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY3 = CONCAT(QUERY3,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		SET QUERY4 = CONCAT(QUERY4,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-	END IF;
-	
-	-- Loc theo du an
-	IF col IS NOT NULL AND col = 'p.name' THEN 
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1''))' );
-		SET QUERY2 = CONCAT(QUERY2,' AND (t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1''))' );
-		SET QUERY3 = CONCAT(QUERY3,' AND (t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1''))' );
-		SET QUERY4 = CONCAT(QUERY4,' AND (t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1''))' );
-	END IF;
-	
-	-- Loc theo uu tien
-	IF col IS NOT NULL AND col = 't.pri' THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER) ' );
-		SET QUERY2 = CONCAT(QUERY2,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER) ' );
-		SET QUERY3 = CONCAT(QUERY3,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER) ' );
-		SET QUERY4 = CONCAT(QUERY4,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER) ' );
-	END IF;
-	
-	-- Lọc các task theo col, val
-	IF col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' AND col <> 't.pri' THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY3 = CONCAT(QUERY3,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		SET QUERY4 = CONCAT(QUERY4,' AND (', col, ' LIKE N\'%', val ,'%\')');
-	END IF;
-	
-	-- Gộp theo ngày và sắp xếp theo ngày từ h về trước
-	SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1 ORDER BY 1');
-	SET QUERY2 = CONCAT(QUERY2,'GROUP BY 1 ORDER BY 1');
-	SET QUERY3 = CONCAT(QUERY3,'GROUP BY 1 ORDER BY Year(t.openedDate), Month(t.openedDate)');
-	SET QUERY4 = CONCAT(QUERY4,'GROUP BY 1 ORDER BY Year(t.openedDate), Month(t.openedDate), Day(t.openedDate)');
-	
-	IF year_ IS NULL AND month_ IS NULL AND day_ IS NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY1;
-		SET @SQL := QUERY1;
-		PREPARE stmt FROM @SQL;
-		EXECUTE stmt;
-		DEALLOCATE PREPARE stmt;
-	END IF;
-	
-	IF year_ IS NOT NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY2;
-		SET @SQL := QUERY2;
-		PREPARE stmt2 FROM @SQL;
-		EXECUTE stmt2;
-		DEALLOCATE PREPARE stmt2;
-	END IF;
-	
-	IF month_ IS NOT NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY3;
-		SET @SQL := QUERY3;
-		PREPARE stmt3 FROM @SQL;
-		EXECUTE stmt3;
-		DEALLOCATE PREPARE stmt3;
-	END IF;
-	
-	IF day_ IS NOT NULL THEN
-		-- In và khởi chạy query
-		-- SELECT QUERY4;
-		SET @SQL := QUERY4;
-		PREPARE stmt4 FROM @SQL;
-		EXECUTE stmt4;
-		DEALLOCATE PREPARE stmt4;
-	END IF;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_task_total_delay_task
-DELIMITER //
-CREATE PROCEDURE `dsa_task_total_delay_task`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 NVARCHAR(4000);
-	
-	-- Trả về tổng số task trễ
-	SET QUERY1 = 
-	'SELECT
-		COUNT(t.id) as total_delay_task
+	'(SELECT
+		CONCAT(''['',p.potentialname , '' ('',p.potential_no, '')'', '']'',''(http://uatcrm.fastdn.com.vn/index.php?module=Potentials&view=Detail&record='',p.potentialid,''&app=SALES)'') ''company'',
+		CASE 
+			WHEN u.user_name IS NULL THEN ''Không xác định''
+			WHEN u.user_name = '''' THEN ''Trống''
+			ELSE u.user_name
+		END ''u.user_name'', 
+		m.modcommentsid id,
+		CONCAT(u.last_name, '' '', u.first_name) name,
+		m.commentcontent content,
+		c.createdtime time
 	FROM
-		zt_task t
+		((((((vtiger_potential p
 	INNER JOIN
-		zt_project p
+		vtiger_crmentity c
 	ON
-		t.project = p.id 
-	WHERE 1=1 ';
+		c.crmid = p.potentialid)
+	INNER JOIN
+		vtiger_modcomments m
+	ON
+		m.related_to = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		m.parent_comments <> 0 AND c.deleted = 0 AND 1=1 ';
 	
-	-- Lọc các task có số ngày tương tác lần cuối là >= 7, trạng thái chưa hoàn thành và cũng không đóng hay xóa, cũng như lọc project mà chưa xóa
-	SET QUERY1 = CONCAT(QUERY1, 'AND DATEDIFF(DATE(NOW()), DATE(t.lastEditedDate)) >= 7 AND t.STATUS IN (''doing'', ''wait'', ''pause'') AND t.deleted <> ''1'' AND p.deleted <> ''1''');
+	CASE 
 	
-	-- Lọc các task có thời gian tạo nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.lastEditedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo mức độ ưu tiên
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.lastEditedDate IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 't.finishedDate' AND col <> 't.openedDate' AND col <> 's.title' AND col <> 'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+			END IF;
 			
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+			END IF;	
 		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
+		WHEN date_type = 'Ngày đóng' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+				SET QUERY2 = CONCAT(QUERY2,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+				SET QUERY2 = CONCAT(QUERY2,' ');
+			END IF;
+			
 	END CASE;
 	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
 	
-	-- In và khởi chạy query
-	-- SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt FROM @SQL;
-	EXECUTE stmt;
-	DEALLOCATE PREPARE stmt;
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
 	
-END//
-DELIMITER ;
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+			SET QUERY2 = CONCAT(QUERY2,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+		SET QUERY2 = CONCAT(QUERY2,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
 
--- Dumping structure for procedure dsapms.dsa_task_total_hour
-DELIMITER //
-CREATE PROCEDURE `dsa_task_total_hour`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	-- Tính tổng thời gian thực hiện của các task đã hoàn thành
-	DECLARE QUERY1 NVARCHAR(4000);
-	SET QUERY1 = 
-	'SELECT 
-		CASE
-			WHEN SUM(t.consumed) IS NULL THEN 0
-			ELSE SUM(t.consumed)
-		END 
-			total_hour
-	FROM 
-		zt_task t
-	INNER JOIN 
-		zt_project p 
-	ON 
-		t.project = p.id
-	WHERE 1=1 ';
-	
-	-- Lọc các task có trạng thái đã hoàn thành, không phải là task parent và chưa bị xóa
-	SET QUERY1 = CONCAT(QUERY1, ' AND (t.status IN (''done'', ''closed'')) AND (t.parent <> -1) AND (t.deleted <>''1'') AND (p.deleted <>''1'') ');
-	
-	-- Lọc các task có thời gian hoàn thành nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedDate BETWEEN \' ',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+		SET QUERY2 = CONCAT(QUERY2,' AND (u.user_name IS NULL)');
 	END IF;
 	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+		SET QUERY2 = CONCAT(QUERY2,' AND (',col,' = '''' )');
 	END IF;
 	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedBy = \'', username ,'\' )');
-	END IF;
+	SET QUERY1 = CONCAT(QUERY1,')');
+	SET QUERY2 = CONCAT(QUERY2,')');
 	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
+	SET QUERY = CONCAT('
+	SELECT 
+		t1.company,
+		t1.`u.user_name`,
+		CONCAT(t1.name,'': '',t1.content) comment,
+		GROUP_CONCAT(t2.name, '': '', t2.content SEPARATOR ''\n'') answer
+	FROM ', QUERY1, 'as t1 LEFT JOIN ', QUERY2,' as t2 ON t1.id = t2.id GROUP BY 1, 2 ORDER BY t1.time, t2.time');
 	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.finishedBy IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
 	
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' AND col <> 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-		
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-	
-	-- In và khởi chạy query
-	SELECT QUERY1;
-	SET @SQL := QUERY1;
+	SELECT QUERY;
+	SET @SQL := QUERY;
 	PREPARE stmt4 FROM @SQL;
 	EXECUTE stmt4;
 	DEALLOCATE PREPARE stmt4;
+	
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_task_total_task
+-- Dumping structure for procedure crm.dsa_potential_ddl_all
 DELIMITER //
-CREATE PROCEDURE `dsa_task_total_task`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `story` INT,
-	IN `dept` INT,
-	IN `col` VARCHAR(300),
-	IN `val` VARCHAR(300),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	-- Đếm các task đã tạo
-	DECLARE QUERY1 NVARCHAR(4000);
-	SET QUERY1 = 
-	'SELECT 
-		COUNT(t.id) as total_task 
-    FROM 
-	 	zt_task t
-    INNER JOIN 
-	 	zt_project p
-    ON 
-	 	t.project = p.id
-    WHERE 1=1 ';
-    
-   -- Lọc các task, project chưa bị xóa 
-	SET QUERY1 = CONCAT(QUERY1, ' AND t.deleted <>''1'' AND p.deleted <>''1'' AND t.parent<>-1');
-	
-	-- Lọc các task có thời gian hoàn thành nằm trong khoảng đã cho
-	IF start_date IS NOT NULL AND end_date IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.openedDate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
-	END IF;
-	
-	-- Lọc các task theo dự án
-	IF project_id IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.project = ', project_id,' )');
-	END IF;
-	
-	-- Lọc các task theo user
-	IF username IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo = \'', username ,'\' )');
-	END IF;
-	
-	-- Lọc các task theo story
-	IF story IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.story = ', story,')');
-	END IF;
-	
-	-- Lọc các task theo department
-	IF dept IS NOT NULL THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND (t.assignedTo IN (SELECT u.account FROM zt_user u INNER JOIN zt_dept d ON u.dept = d.id WHERE u.dept= ',dept,'))');
-	END IF;
-
-	# col, val
-	CASE
-		-- col, val binh thuong
-		WHEN col IS NOT NULL AND col <> 's.title' AND col <> 'p.name' AND col <> 't.pri'THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND (', col, ' LIKE N\'%', val ,'%\')');
-		
-		-- Loc theo story
-		WHEN col IS NOT NULL AND col = 's.title' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.story IN (SELECT id FROM zt_story WHERE title=N\'',val,'\' AND deleted <> ''1'')' );
-			
-		-- Loc theo du an
-		WHEN col IS NOT NULL AND col = 'p.name' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.project = (SELECT id FROM zt_project WHERE name=N\'',val,'\' AND deleted <> ''1'')' );
-			
-		-- Loc theo uu tien
-		WHEN col IS NOT NULL AND col = 't.pri' THEN SET
-			QUERY1 = CONCAT(QUERY1,' AND t.pri = CONVERT(RIGHT(\'',val,'\',1),SIGNED INTEGER)' );
-		
-		ELSE SELECT 1;
-		
-	END CASE;
-	
-	-- In và khởi chạy query
-	SELECT QUERY1;
-	SET @SQL := QUERY1;
-	PREPARE stmt4 FROM @SQL;
-	EXECUTE stmt4;
-	DEALLOCATE PREPARE stmt4;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user
-DELIMITER //
-CREATE PROCEDURE `dsa_user`(
-	IN `id_proc` VARCHAR(50),
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50),
-	IN `year_` INT,
-	IN `month_` INT,
-	IN `day_` INT
-)
-BEGIN
-	
-	IF id_proc = 'user_0_task' THEN
-		CALL dsa_user_without_task (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-   /*Overview*/
-	IF id_proc = 'ov_NV' THEN
-		CALL dsa_user_total_bang (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'ov_taskopened' THEN
-		CALL dsa_user_taskopened_total (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'ov_taskdone' THEN
-		CALL dsa_user_taskdone_total (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	/*Bar chart*/
-	IF id_proc = 'bar_taskopened' THEN
-		CALL dsa_user_taskopened_bar (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'bar_taskdone' THEN
-		CALL dsa_user_taskdone_bar (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	/*Pie chart*/
-	IF id_proc = 'pie_taskdone' THEN
-		CALL dsa_user_taskdone_detail_pie (start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	/*Line chart*/
-	IF id_proc = 'line_taskopened' THEN
-		CALL dsa_user_taskopened_bytime_line (start_date,end_date,project_id,username,dept_id,col,val,year_,month_,day_);
-	END IF;
-	
-	IF id_proc = 'line_taskdone' THEN
-		CALL dsa_user_taskdone_bytime_line (start_date,end_date,project_id,username,dept_id,col,val,year_,month_,day_);
-	END IF;
-	
-	/*Bar chart project*/
-	IF id_proc = 'bar_project' THEN
-		CALL dsa_user_project_bar(start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'table_project' THEN
-		CALL dsa_user_project_table(start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'line_productivity' THEN
-		CALL dsa_user_productivity_line(start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'ov_taskdone_percentage' THEN
-		CALL dsa_user_taskdone_percentage(start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'ov_taskdone_byopenedby' THEN
-		CALL dsa_user_taskdone_byopenedby(start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-	
-	IF id_proc = 'ov_taskdone_byothers' THEN
-		CALL dsa_user_taskdone_byothers(start_date,end_date,project_id,username,dept_id,col,val);
-	END IF;
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_ddl
-DELIMITER //
-CREATE PROCEDURE `dsa_user_ddl`(
+CREATE PROCEDURE `dsa_potential_ddl_all`(
 	IN `id_ddl` VARCHAR(50)
 )
 BEGIN
-	IF id_ddl = 'ddl_project' THEN
-		CALL dsa_user_dropdown_project();
+	IF id_ddl = 'ddl_potential_company' THEN
+		CALL `dsa_potential_ddl_company`;
 	END IF;
 	
-	IF id_ddl = 'ddl_user' THEN
-		CALL dsa_user_dropdown_username();
+	IF id_ddl = 'ddl_potential_dept' THEN
+		CALL `dsa_potential_ddl_dept`;
+	END IF;
+	
+	IF id_ddl = 'ddl_potential_product' THEN
+		CALL `dsa_potential_ddl_product`;
+	END IF;
+	
+	IF id_ddl = 'ddl_potential_status' THEN
+		CALL `dsa_potential_ddl_status`;
+	END IF;
+	
+	IF id_ddl = 'ddl_potential_assign' THEN
+		CALL `dsa_potential_ddl_user_assign`;
+	END IF;
+	
+	IF id_ddl = 'ddl_potential_mkt' THEN
+		CALL `dsa_potential_ddl_user_mkt`;
+	END IF;
+	
+	IF id_ddl = 'ddl_potential_service' THEN
+		CALL `dsa_potential_ddl_user_service`;
+	END IF;
+	
+	IF id_ddl = 'ddl_potential_sales_stage' THEN
+		CALL `dsa_potential_ddl_sales_stage`;
+	END IF;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_company
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_company`()
+BEGIN
+
+	SELECT 
+		p.potentialname 
+	FROM
+		vtiger_potential p 
+	INNER JOIN
+		vtiger_crmentity c 
+	ON
+		c.crmid = p.potentialid
+	WHERE
+		c.deleted = 0;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_dept
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_dept`()
+BEGIN
+	SELECT
+		g.groupid,
+		CONCAT(g.groupname,' (', g.groupid,')')
+	FROM
+		vtiger_groups g;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_product
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_product`()
+BEGIN
+
+	SELECT 
+		pr.productid,
+		pr.productname
+	FROM
+		vtiger_products pr
+	INNER JOIN
+		vtiger_crmentity c 
+	ON
+		c.crmid = pr.productid
+	WHERE
+		c.deleted = 0;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_sales_stage
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_sales_stage`()
+BEGIN
+
+	SELECT 
+		DISTINCT p.sales_stage
+	FROM
+		vtiger_potential p 
+	INNER JOIN
+		vtiger_crmentity c 
+	ON
+		c.crmid = p.potentialid
+	WHERE
+		c.deleted = 0;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_status
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_status`()
+BEGIN
+
+	SELECT 
+		DISTINCT CASE 
+			WHEN pcf.cf_987 = '' THEN 'Không xác định' 
+			WHEN pcf.cf_987 IS NULL THEN 'Trống'
+			ELSE pcf.cf_987 END
+	FROM
+		((vtiger_potential p 
+	INNER JOIN
+		vtiger_crmentity c 
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		pcf.potentialid = p.potentialid) 
+	WHERE
+		c.deleted = 0;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_user_assign
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_user_assign`()
+BEGIN
+
+	SELECT
+		u.id,
+		CONCAT(u.last_name,' ', u.first_name, ' (', u.user_name, ')') 'u.name'
+	FROM
+		vtiger_users u
+	WHERE
+		u.deleted = '0';
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_user_mkt
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_user_mkt`()
+BEGIN
+		
+	SELECT
+		DISTINCT CASE 
+			WHEN pcf.cf_985 = '' THEN 'Không xác định'
+			WHEN pcf.cf_985 IS NULL THEN 'Trống'
+			ELSE pcf.cf_985 END
+	FROM
+		vtiger_potentialscf pcf;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_ddl_user_service
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_ddl_user_service`()
+BEGIN
+
+	SELECT
+		DISTINCT CASE 
+			WHEN pcf.cf_901 = '' THEN 'Không xác định' 
+			WHEN pcf.cf_901 IS NULL THEN 'Trống'
+			ELSE pcf.cf_901 END
+	FROM
+		vtiger_potentialscf pcf;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_delay
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_delay`(
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `days_delay` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CONCAT(''['',p.potentialname , '' ('',p.potential_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Potentials&view=Detail&record='',p.potentialid,''&app=SALES)'') ''p.potentialname'',
+		u.user_name ''u.user_name'',
+		p.sales_stage ''p.sales_stage'',
+		DATEDIFF(DATE(NOW()), DATE(c.modifiedtime)) ''delay_days''
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND 1=1 AND p.sales_stage NOT IN (''Closed Won'', ''Closed Lost'') ';
+	   
+	IF days_delay IS NOT NULL AND days_delay = 7 THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND DATEDIFF(DATE(NOW()), DATE(c.modifiedtime)) BETWEEN 7 AND 15');
+	ELSE
+		SET QUERY1 = CONCAT(QUERY1,' AND DATEDIFF(DATE(NOW()), DATE(c.modifiedtime)) >= 16');
+	END IF;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1,' ORDER BY 4 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_delay_2
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_delay_2`(
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `start_prob` INT,
+	IN `end_prob` INT,
+	IN `start_prob2` INT,
+	IN `end_prob2` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+
+
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CONCAT(''['',p.potentialname , '' ('',p.potential_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Potentials&view=Detail&record='',p.potentialid,''&app=SALES)'') ''p.potentialname'',
+		u.user_name ''u.user_name'',
+		p.sales_stage ''p.sales_stage'',
+		TIMESTAMPDIFF(MONTH, DATE(c.createdtime),NOW()) ''delay_days'',
+		TIMESTAMPDIFF(MONTH, DATE(p.closingdate),NOW()) ''delay_days_2''
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND 1=1 AND p.sales_stage NOT IN (''Closed Won'', ''Closed Lost'') ';
+	
+	IF start_prob IS NOT NULL AND end_prob IS NOT NULL THEN
+		SET QUERY1 = CONCAT(QUERY1,' AND (TIMESTAMPDIFF(MONTH, DATE(c.createdtime),NOW()) BETWEEN ',start_prob,' AND ', end_prob,' ) ' );
+	END IF;
+
+	IF start_prob2 IS NOT NULL AND end_prob2 IS NOT NULL THEN
+		SET QUERY1 = CONCAT(QUERY1,' AND (TIMESTAMPDIFF(MONTH, DATE(p.closingdate),NOW()) BETWEEN ',start_prob2,' AND ', end_prob2,' ) ' );
+	END IF;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1,' ORDER BY 4 DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_detail`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `start_prob` INT,
+	IN `end_prob` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		CONCAT(''['',p.potentialname , '' ('',p.potential_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=Potentials&view=Detail&record='',p.potentialid,''&app=SALES)'') ''p.potentialname'',
+		
+		COUNT(DISTINCT s.activityid) ''num_ac'',
+		
+		p.sales_stage ''p.sales_stage'',	
+		
+		CASE 
+			WHEN u.user_name IS NULL THEN ''Không xác định''
+			WHEN u.user_name = '''' THEN ''Trống''
+			ELSE u.user_name
+		END ''u.user_name'', 
+		
+		ROUND(p.forecast_amount) ''p.forecast_amount'',
+		
+		p.probability ''p.probability'',
+		
+		c.createdtime ''c.createdtime'',
+		
+		c.modifiedtime ''c.modifiedtime'',
+		
+		p.closingdate ''p.closingdate''
+		
+	FROM
+		((((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	LEFT JOIN
+		vtiger_seactivityrel s
+	ON
+		s.crmid = c.crmid)
+	WHERE 
+		c.deleted <> 1 AND 1=1 ';
+	
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN 
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )');
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+	END CASE;
+	
+	IF start_prob IS NOT NULL AND end_prob IS NOT NULL THEN
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.probability BETWEEN ',start_prob,' AND ', end_prob,' ) ' );
+	END IF;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	SET QUERY1 = CONCAT(QUERY1,'GROUP BY 1,3,4,5,6,7 ORDER BY c.createdtime DESC');
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_total_potential
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_total_potential`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		COUNT(DISTINCT p.potentialid) as total_potential
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND 1=1 ';
+	   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN 
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )');
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_total_potential_lost
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_total_potential_lost`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		COUNT(DISTINCT p.potentialid) as total_potential_lost
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND p.sales_stage = ''Closed Lost'' AND 1=1 ';
+	   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN 
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )');
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_total_potential_sale
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_total_potential_sale`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		COUNT(DISTINCT p.potentialid) as total_potential_sale
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND p.sales_stage NOT IN (''Closed Lost'', ''Closed Won'') AND 1=1 ';
+	   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN 
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )');
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_potential_total_potential_won
+DELIMITER //
+CREATE PROCEDURE `dsa_potential_total_potential_won`(
+	IN `date_type` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `user_assign_id` INT,
+	IN `user_service` VARCHAR(50),
+	IN `user_mkt` VARCHAR(50),
+	IN `status` VARCHAR(50),
+	IN `sales_stage` VARCHAR(50),
+	IN `potential` VARCHAR(100),
+	IN `dept` INT,
+	IN `product` INT,
+	IN `col` VARCHAR(300),
+	IN `val` VARCHAR(300)
+)
+BEGIN
+	
+	DECLARE QUERY1 NVARCHAR(4000);
+	
+	SET QUERY1 = 
+	'SELECT
+		COUNT(DISTINCT p.potentialid) as total_potential_won
+	FROM
+		(((((vtiger_potential p
+	INNER JOIN
+		vtiger_crmentity c
+	ON
+		c.crmid = p.potentialid)
+	LEFT JOIN
+		vtiger_potentialscf pcf
+	ON
+		p.potentialid = pcf.potentialid)
+	LEFT JOIN
+		vtiger_users u
+	ON
+		c.smownerid = u.id)
+	LEFT JOIN
+		vtiger_seproductsrel pse
+	ON
+		pse.crmid = c.crmid)
+	LEFT JOIN
+		vtiger_products pr
+	ON
+		pr.productid = pse.productid)
+	WHERE 
+		c.deleted <> 1 AND p.sales_stage = ''Closed Won'' AND 1=1 ';
+	   
+   CASE 
+		WHEN date_type = 'Ngày tạo' OR date_type IS NULL THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.createdtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày chỉnh sửa' THEN
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (c.modifiedtime BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )' );
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+		
+		WHEN date_type = 'Ngày đóng' THEN 
+			IF start_date IS NOT NULL AND end_date IS NOT NULL THEN 
+				SET QUERY1 = CONCAT(QUERY1,' AND (p.closingdate BETWEEN \'',start_date,' 00:00:00 \' ',' AND \' ', end_date, ' 23:59:59\' )');
+			ELSE
+				SET QUERY1 = CONCAT(QUERY1,' ');
+			END IF;
+	END CASE;
+	
+	IF user_assign_id IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = \'', user_assign_id ,'\' )');
+	END IF;
+	
+	IF user_service IS NOT NULL THEN 
+		IF user_service = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_901 = \'', user_service ,'\' )');
+		END IF;
+	END IF;
+	
+	IF user_mkt IS NOT NULL THEN 
+		IF user_mkt = '' THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = '''' )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_985 = \'', user_mkt ,'\' )');
+		END IF;
+	END IF;
+	
+	IF status IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (pcf.cf_987 = \'', status ,'\' )');
+	END IF;
+	
+	IF sales_stage IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.sales_stage = \'', sales_stage ,'\' )');
+	END IF;
+	
+	IF potential IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (p.potentialname = \'', potential ,'\' )');
+	END IF;
+	
+	IF dept IS NOT NULL THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (c.smownerid = ', dept ,' )');
+	END IF;
+	
+	IF product IS NOT NULL THEN 
+		IF product = 0 THEN
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid IS NULL )');
+		ELSE
+			SET QUERY1 = CONCAT(QUERY1,' AND (pr.productid = ', product ,' )');
+		END IF;
+	END IF;
+	
+	
+	IF col IS NOT NULL AND val <> 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (', col, ' = N\'', val ,'\')');
+	END IF;	
+
+	IF col ='u.user_name' AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (u.user_name IS NULL)');
+	END IF;
+	
+	IF (col = 'pcf.cf_987' OR col = 'p.leadsource') AND val = 'Không xác định' THEN 
+		SET QUERY1 = CONCAT(QUERY1,' AND (',col,' = '''' )');
+	END IF;
+	
+	
+	SELECT QUERY1;
+	SET @SQL := QUERY1;
+	PREPARE stmt4 FROM @SQL;
+	EXECUTE stmt4;
+	DEALLOCATE PREPARE stmt4;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_all
+DELIMITER //
+CREATE PROCEDURE `dsa_support_all`(
+	IN `id_proc` VARCHAR(50),
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `delay_day` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+
+)
+BEGIN
+   
+	IF id_proc = 'ov_support' THEN
+		CALL dsa_support_total_support(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_support_open' THEN
+		CALL dsa_support_total_support_open(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_support_closed' THEN
+		CALL dsa_support_total_support_closed(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	
+	
+		
+	IF id_proc = 'user_assign' THEN
+		CALL dsa_support_user(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+		
+	IF id_proc = 'status' THEN
+		CALL dsa_support_status(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+		
+	
+	
+	
+		
+	IF id_proc = 'detail_delay' THEN
+		CALL dsa_support_detail_delay(account_id,account_status,user_assign,dept_id,status,delay_day,col,val);
+	END IF;
+	
+	IF id_proc = 'detail' THEN
+		CALL dsa_support_detail(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'detail_delay_without_count' THEN
+		CALL dsa_support_detail_delay_without_count(account_id,account_status,user_assign,dept_id,status,delay_day,col,val);
+	END IF;
+	
+	IF id_proc = 'detail_delay_with_count' THEN
+		CALL dsa_support_detail_delay_with_count(account_id,account_status,user_assign,dept_id,status,delay_day,col,val);
+	END IF;
+	
+	
+	IF id_proc = 'support_day' THEN
+		CALL dsa_support_day(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'support_month' THEN
+		CALL dsa_support_month(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'support_quarter' THEN
+		CALL dsa_support_quarter(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'support_year' THEN
+		CALL dsa_support_year(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	
+	IF id_proc = 'location' THEN
+		CALL dsa_support_location(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	IF id_proc = 'priority' THEN
+		CALL dsa_support_priority(timetype,start_date,end_date,account_id,account_status,user_assign,dept_id,status,col,val);
+	END IF;
+	
+	
+	
+		
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_day
+DELIMITER //
+CREATE PROCEDURE `dsa_support_day`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CONCAT(Day(c.createdtime),''/'',Month(c.createdtime),''/'', Year(c.createdtime)) day, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+										FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+
+																 
+								WHERE 1=1');
+								
+								
+	SET myquery_2 = CONCAT('SELECT CONCAT(Day(c.modifiedtime),''/'',Month(c.modifiedtime),''/'', Year(c.modifiedtime)) day, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,priority,
+												(CASE WHEN status = ''Closed'' THEN ''Đã đóng''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' THEN ''Mở''
+													WHEN status = ''Wait For Response'' THEN ''Đợi phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+								FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+
+																		 
+								WHERE 1=1');
+							
+
+	SET myquery_1 = CONCAT(myquery_1, ' AND c.deleted = ''0''');
+	SET myquery_1 = CONCAT(myquery_1, ' AND c2.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c2.deleted = ''0''');
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.cf_891 = ''',account_status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.cf_891 = ''',account_status,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.ticketid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery_1 = CONCAT(myquery_1, ' GROUP BY 1 ORDER BY YEAR(c.createdtime), MONTH(c.createdtime), DAY(c.createdtime)');
+	SET myquery_2 = CONCAT(myquery_2, ' GROUP BY 1 ORDER BY YEAR(c.modifiedtime), MONTH(c.modifiedtime), DAY(c.modifiedtime)');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_ddl_account
+DELIMITER //
+CREATE PROCEDURE `dsa_support_ddl_account`()
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT c.crmid, CONCAT(c.label,'' ('', a.account_no, '')'')
+								FROM (SELECT accountid,account_no,accountname,
+												CASE WHEN industry='''' OR industry IS NULL THEN ''Unknown'' ELSE industry END AS ''industry'',
+												annualrevenue,employees,isconvertedfromlead
+										FROM vtiger_account) a
+								
+								JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								WHERE c.deleted = ''0''		
+								ORDER BY c.label');
+								
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_ddl_account_status
+DELIMITER //
+CREATE PROCEDURE `dsa_support_ddl_account_status`()
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT a.cf_891
+								FROM (SELECT accountid, 
+												(CASE WHEN cf_891 IS NULL OR cf_891 = '''' THEN ''Không xác định'' 
+														ELSE cf_891 END) AS ''cf_891''
+										FROM vtiger_accountscf ) a
+								
+								JOIN vtiger_crmentity c
+								ON c.crmid = a.accountid
+								
+								WHERE c.deleted = ''0''		
+								ORDER BY c.label');
+								
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_ddl_all
+DELIMITER //
+CREATE PROCEDURE `dsa_support_ddl_all`(
+	IN `id_ddl` VARCHAR(50)
+)
+BEGIN
+	IF id_ddl = 'ddl_account' THEN
+		CALL dsa_support_ddl_account();
 	END IF;
 	
 	IF id_ddl = 'ddl_dept' THEN
-		CALL dsa_user_dropdown_department();
+		CALL dsa_support_ddl_dept();
 	END IF;
+
+	IF id_ddl = 'ddl_user_assign' THEN
+		CALL dsa_support_ddl_user_assign();
+	END IF;
+	
+	IF id_ddl = 'ddl_status' THEN
+		CALL dsa_support_ddl_status();
+	END IF;
+	
+	IF id_ddl = 'ddl_account_status' THEN
+		CALL dsa_support_ddl_account_status();
+	END IF;
+	
+
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_dropdown_department
+-- Dumping structure for procedure crm.dsa_support_ddl_dept
 DELIMITER //
-CREATE PROCEDURE `dsa_user_dropdown_department`()
+CREATE PROCEDURE `dsa_support_ddl_dept`()
 BEGIN
 	DECLARE myquery nvarchar(2000);
+
+	SET myquery = CONCAT('SELECT g.groupid, g.groupname 
+								FROM vtiger_groups g
+								ORDER BY g.groupname');
 	
-	SET myquery = CONCAT('SELECT DISTINCT id, name
-								FROM zt_dept
-								ORDER BY name');
-							
+
+	SELECT myquery;
 	SET @SQL := myquery;
  	PREPARE my_query FROM @SQL;
 	EXECUTE my_query;
+	
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_dropdown_project
+-- Dumping structure for procedure crm.dsa_support_ddl_status
 DELIMITER //
-CREATE PROCEDURE `dsa_user_dropdown_project`()
+CREATE PROCEDURE `dsa_support_ddl_status`()
 BEGIN
 	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT DISTINCT t.status
+								FROM (SELECT CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định''END AS ''status''
+										FROM vtiger_troubletickets) t');
 	
-	SET myquery = CONCAT('SELECT DISTINCT id, CONCAT(NAME,'' ('',id,'')'')
-								FROM zt_project
-								WHERE deleted = ''0''
-								ORDER BY name ');
-							
+
+	SELECT myquery;
 	SET @SQL := myquery;
  	PREPARE my_query FROM @SQL;
 	EXECUTE my_query;
+	
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_dropdown_username
+-- Dumping structure for procedure crm.dsa_support_ddl_user_assign
 DELIMITER //
-CREATE PROCEDURE `dsa_user_dropdown_username`()
+CREATE PROCEDURE `dsa_support_ddl_user_assign`()
 BEGIN
 	DECLARE myquery nvarchar(2000);
-	
-	SET myquery = CONCAT('SELECT DISTINCT account, CONCAT(realname,'' ('',account,'')'') AS name
-								FROM zt_user
-								WHERE deleted = ''0''
-								ORDER BY account ');
+	SET myquery = CONCAT('(SELECT u.id, CONCAT(u.last_name,'' '', u.first_name, '' ('', u.user_name, '')'') AS ''NV_assign''
+								FROM vtiger_users u
+								WHERE u.deleted = ''0''
+								ORDER BY u.user_name)');
 	
 
+	SELECT myquery;
 	SET @SQL := myquery;
  	PREPARE my_query FROM @SQL;
 	EXECUTE my_query;
+	
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_productivity_line
+-- Dumping structure for procedure crm.dsa_support_detail
 DELIMITER //
-CREATE PROCEDURE `dsa_user_productivity_line`(
+CREATE PROCEDURE `dsa_support_detail`(
+	IN `timetype` INT,
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
 	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
 	IN `col` VARCHAR(50),
 	IN `val` VARCHAR(50)
 )
 BEGIN
-	DECLARE myquery nvarchar(2000);
-	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT CONCAT(Day(t.finishedDate),''/'',Month(t.finishedDate),''/'', Year(t.finishedDate)) AS thoi_gian, 
-									(CASE WHEN SUM(t.consumed) IS NULL THEN 0
-										ELSE CONCAT(ROUND (SUM(t.consumed)/(8*COUNT(DISTINCT u.account))*100,2),''%'')  
-										END) AS Nang_suat
-										
-								FROM (SELECT *,
-								   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-											WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																												OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-											WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																												OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-														
-											WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-											WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-											ELSE '''' END) AS TT_MORONG
-								FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.finishedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE 1=1');
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND t.finishedBy = ''', username, '''');							
-	END IF;
-	
-	/*Lọc các task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.finishedDate ) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery, ' GROUP BY 1 ORDER BY YEAR(t.finishedDate), MONTH(t.finishedDate), DAY(t.finishedDate)');
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-	
-END//
-DELIMITER ;
+	DECLARE myquery nvarchar(4000);
 
--- Dumping structure for procedure dsapms.dsa_user_project_bar
-DELIMITER //
-CREATE PROCEDURE `dsa_user_project_bar`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT DISTINCT t.ticketid ''t.ticketid'', 
+										CONCAT(''['',c.label , '' ('',t.ticket_no, '')'', '']'',''(http://crm.fastdn.com.vn/index.php?module=HelpDesk&view=Detail&record='',t.ticketid,''&app=SUPPORT)'') ''c.label'',
+										c.description ''c.description'',
+										u.user_name ''u.user_name'',
+										t.status ''t.status'',
+										t.priority ''t.priority'',
+										DATE(c.createdtime) AS ''c.createdtime'',
+										DATE(c.modifiedtime) AS ''c.modifiedtime'',
+										c2.crmid ''c2.crmid'',
+										CONCAT(''['',c2.label ,'']'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c2.crmid,'')'') ''c2.label''
+								FROM vtiger_crmentity c 
 	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT tm.account,COUNT(tm.id)
-								FROM zt_team tm
-								JOIN zt_project p
-								ON tm.root = p.id
-								JOIN zt_user u
-								ON tm.account = u.account
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE 1=1');
-	SET myquery = CONCAT(myquery, ' AND p.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND tm.account = ''', username, '''');							
-	END IF;
-	
-	/*Lọc theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND tm.join BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND tm.root = ''', project_id, '''');
-	END IF;
-	
-		/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery, ' GROUP BY tm.account ORDER BY COUNT(tm.id) DESC, tm.account');
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-	
-END//
-DELIMITER ;
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+										FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
 
--- Dumping structure for procedure dsapms.dsa_user_project_table
-DELIMITER //
-CREATE PROCEDURE `dsa_user_project_table`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT u.account, GROUP_CONCAT(''-'',p.name ORDER BY p.name SEPARATOR ''\n'' )
-								FROM zt_team tm
-								JOIN zt_project p ON tm.root = p.id
-								JOIN zt_user u ON tm.account = u.account
-								LEFT JOIN zt_dept d ON u.dept = d.id
-								WHERE 1=1');
-	SET myquery = CONCAT(myquery, ' AND p.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND tm.account = ''', username, '''');							
-	END IF;
-	
-	/*Lọc theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND tm.join BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND tm.root = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery, ' GROUP BY tm.account ORDER BY tm.account');
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskdone_bar
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_bar`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT t.finishedBy AS NV_Account, u.realname AS name, COUNT(t.id) AS So_luong_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.finishedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE 1=1');
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND t.finishedBy = ''', username, '''');							
-	END IF;
-	
-	/*Lọc các task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.finishedDate ) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF col IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery, ' GROUP BY t.finishedBy ORDER BY COUNT(t.id) DESC, t.finishedBy');
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskdone_byopenedby
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_byopenedby`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	SET myquery = CONCAT('SELECT COUNT(t.id) AS So_luong_task_hoan_thanh_boi_nguoi_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-							JOIN zt_user u
-							ON u.account = t.openedBy
-							LEFT JOIN zt_dept d
-							ON u.dept = d.id
-							WHERE 1=1');
-							
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	SET myquery = CONCAT(myquery, ' AND t.finishedBy = t.openedBy');
-	
-	/*Lọc SL task theo tên NV*/
-	IF (username IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.account = ''', username, '''');							
-   END IF;
-   
-	/*Lọc SL task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;					
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskdone_byothers
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_byothers`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	SET myquery = CONCAT('SELECT COUNT(t.id) AS So_luong_task_da_tao_hoan_thanh_boi_nguoi_khac
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-							JOIN zt_user u
-							ON u.account = t.openedBy
-							LEFT JOIN zt_dept d
-							ON u.dept = d.id
-							WHERE 1=1');
-							
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND t.finishedBy != '''' ');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	SET myquery = CONCAT(myquery, ' AND t.finishedBy != t.openedBy');
-	
-	/*Lọc SL task theo tên NV*/
-	IF (username IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.account = ''', username, '''');							
-   END IF;
-   
-	/*Lọc SL task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;					
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskdone_bytime_line
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_bytime_line`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 nvarchar(2000);
-	DECLARE QUERY2 nvarchar(2000);
-	DECLARE QUERY3 nvarchar(2000);
-	DECLARE QUERY4 nvarchar(2000);
-	
-	/*Chọn các task theo thời gian tạo*/
-	SET QUERY1 = CONCAT('SELECT DATE(t.finishedDate) AS thoi_gian, COUNT(t.id) AS SL_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.finishedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 AND YEAR(t.finishedDate) !=''1970'' AND DATE(t.finishedDate) !=''0000-00-00''');
-							
-	SET QUERY2 = CONCAT('SELECT CAST(Year(t.finishedDate) AS CHAR) AS thoi_gian, COUNT(t.id) AS SL_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.finishedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 AND YEAR(t.finishedDate) !=''1970'' AND DATE(t.finishedDate) !=''0000-00-00''');
+																
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
 								
-	SET QUERY3 = CONCAT('SELECT CONCAT(Month(t.finishedDate),''/'', Year(t.finishedDate)) AS thoi_gian, COUNT(t.id) AS SL_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.finishedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 AND YEAR(t.finishedDate) !=''1970'' AND DATE(t.finishedDate) !=''0000-00-00''');	
-									
-	SET QUERY4 = CONCAT('SELECT CONCAT(Day(t.finishedDate),''/'',Month(t.finishedDate),''/'', Year(t.finishedDate)) AS thoi_gian, COUNT(t.id) AS SL_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.finishedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 AND YEAR(t.finishedDate) !=''1970'' AND DATE(t.finishedDate) !=''0000-00-00''');
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+																		 
+								WHERE 1=1');
+							
+
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery, ' ORDER BY 1 DESC');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_detail_delay
+DELIMITER //
+CREATE PROCEDURE `dsa_support_detail_delay`(
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `delay_day` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	SET myquery = CONCAT('SELECT DISTINCT c2.crmid ''c2.crmid'',
+										CONCAT(''['',c2.label, '' ('',acc.account_no, '')'', '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c2.crmid,''&app=SUPPORT)'') AS ''c2.label'',
+										a.cf_891 ''a.cf_891'',
 										
-	/*Lọc SL task theo tên NV*/
-	IF (username IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND t.finishedBy = ''', username, '''');
-		SET QUERY2 = CONCAT(QUERY2,' AND t.finishedBy = ''', username, '''');
-		SET QUERY3 = CONCAT(QUERY3,' AND t.finishedBy = ''', username, '''');
-		SET QUERY4 = CONCAT(QUERY4,' AND t.finishedBy = ''', username, '''');									
-   END IF;										
-																													
-	/*Lọc SL task theo khoảng thời gian*/
+										CASE WHEN t.ticketid IS NOT NULL AND c.deleted = ''0'' THEN u.user_name		 
+												ELSE '''' END ''u.user_name'',
+										
+										CASE WHEN t.ticketid IS NOT NULL THEN (SELECT COUNT(DISTINCT t.ticketid)
+																																	FROM vtiger_crmentity c 
+																																	INNER JOIN vtiger_troubletickets t 
+																																	ON t.ticketid = c.crmid 
+																																	LEFT JOIN vtiger_users u 
+																																	ON c.smownerid = u.id 
+																																	LEFT JOIN vtiger_account a 
+																																	ON a.accountid = t.parent_id 
+																																	WHERE c.deleted = 0 AND a.accountid=acc.accountid)
+												ELSE 0 END ''num_ticket'',
+										
+										CASE WHEN t.ticketid IS NOT NULL AND c.deleted = ''0'' THEN DATEDIFF(DATE(NOW()), DATE(c.createdtime))
+												ELSE DATEDIFF(DATE(NOW()), DATE(c2.createdtime)) END ''delay_day''
+										
+								FROM vtiger_crmentity c2
+								
+								JOIN vtiger_account acc
+								ON c2.crmid = acc.accountid
+	
+								LEFT JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.parent_id = c2.crmid
+								LEFT JOIN vtiger_crmentity c
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+												 
+								WHERE 1=1');
+							
+
+	
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND CASE WHEN t.ticketid IS NOT NULL THEN t.ticketid IN (SELECT MAX(t.ticketid)
+																																	FROM vtiger_crmentity c 
+																																	INNER JOIN vtiger_troubletickets t 
+																																	ON t.ticketid = c.crmid 
+																																	LEFT JOIN vtiger_account a 
+																																	ON a.accountid = t.parent_id 
+																																	JOIN vtiger_crmentity c2
+																																	ON c2.crmid = a.accountid
+																																	WHERE 
+																																		c.deleted = 0 AND c2.deleted = 0
+																																	GROUP BY a.accountid)
+													ELSE c2.crmid END');
+	SET myquery = CONCAT(myquery, ' AND (DATEDIFF(DATE(NOW()), DATE(c2.createdtime)) >=60 OR DATEDIFF(DATE(NOW()), DATE(c.createdtime)) >=60)');
+
+	
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1');
+	SET myquery = CONCAT(myquery, ' ORDER BY delay_day DESC');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_detail_delay_without_count
+DELIMITER //
+CREATE PROCEDURE `dsa_support_detail_delay_without_count`(
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `delay_day` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+    DETERMINISTIC
+BEGIN
+	DECLARE myquery nvarchar(9000);
+	DECLARE subquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT c2.crmid ''c2.crmid'',
+										CONCAT(''['',c2.label, '' ('',acc.account_no, '')'', '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c2.crmid,''&app=SUPPORT)'') AS ''c2.label'',
+										a.cf_891 ''a.cf_891'',
+										
+										CASE WHEN t.ticketid IS NOT NULL AND t.ticketid !='''' AND c.deleted = ''0'' THEN u.user_name		 
+												ELSE '''' END ''u.user_name'',
+
+										CASE WHEN t.ticketid IS NOT NULL AND c.deleted = ''0'' THEN DATEDIFF(DATE(NOW()), DATE(c.createdtime))
+												ELSE DATEDIFF(DATE(NOW()), DATE(c2.createdtime)) END ''delay_day''
+										
+								FROM vtiger_crmentity c2
+								
+								JOIN vtiger_account acc
+								ON c2.crmid = acc.accountid
+	
+								LEFT JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.parent_id = c2.crmid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON t.ticketid = c.crmid
+
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+												 
+								WHERE 1=1');
+							
+
+	
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND CASE WHEN t.ticketid IS NOT NULL THEN t.ticketid IN (SELECT MAX(t.ticketid)
+																																	FROM vtiger_crmentity c 
+																																	INNER JOIN vtiger_troubletickets t 
+																																	ON t.ticketid = c.crmid 
+																																	LEFT JOIN vtiger_account a 
+																																	ON a.accountid = t.parent_id 
+																																	JOIN vtiger_crmentity c2
+																																	ON c2.crmid = a.accountid
+																																	WHERE 
+																																		c2.deleted = 0
+																																	GROUP BY a.accountid)
+													ELSE c2.crmid END');
+	
+
+	
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+	
+	SET subquery = ' FROM vtiger_crmentity c 
+					INNER JOIN vtiger_troubletickets t 
+					ON t.ticketid = c.crmid 
+					LEFT JOIN vtiger_users u 
+					ON c.smownerid = u.id 
+					LEFT JOIN vtiger_account a 
+					ON a.accountid = t.parent_id
+					LEFT JOIN vtiger_users2group ug
+					ON ug.userid = c.smownerid 
+					WHERE c.deleted = 0 AND a.accountid=acc.accountid
+					AND t.ticketid IN (SELECT MAX(t.ticketid)
+											FROM vtiger_crmentity c 
+											INNER JOIN vtiger_troubletickets t 
+											ON t.ticketid = c.crmid 
+											LEFT JOIN vtiger_account a 
+											ON a.accountid = t.parent_id 
+											JOIN vtiger_crmentity c2
+											ON c2.crmid = a.accountid
+											WHERE 
+												c.deleted = 0 AND c2.deleted = 0
+											GROUP BY a.accountid)';	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,'AND c.smownerid IN (','SELECT c.smownerid',subquery,' AND c.smownerid = ''',user_assign,''')');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		
+		SET myquery = CONCAT(myquery,'AND ug.groupid IN (','SELECT ug.groupid',subquery,' AND ug.groupid = ''',dept_id,''')');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,'AND t.status IN (','SELECT t.status',subquery,' AND t.status = ''',status,''')');
+	END IF;
+
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		
+		SET myquery = CONCAT(myquery,' AND ',col, ' IN (SELECT ', col,
+																		' FROM vtiger_crmentity c 
+																		INNER JOIN vtiger_troubletickets t 
+																		ON t.ticketid = c.crmid 
+																		LEFT JOIN vtiger_users u 
+																		ON c.smownerid = u.id 
+																		LEFT JOIN vtiger_account a 
+																		ON a.accountid = t.parent_id 
+																		WHERE c.deleted = 0 AND a.accountid=acc.accountid
+																		AND t.ticketid IN (SELECT MAX(t.ticketid)
+																								FROM vtiger_crmentity c 
+																								INNER JOIN vtiger_troubletickets t 
+																								ON t.ticketid = c.crmid 
+																								LEFT JOIN vtiger_account a 
+																								ON a.accountid = t.parent_id 
+																								JOIN vtiger_crmentity c2
+																								ON c2.crmid = a.accountid
+																								WHERE 
+																									c.deleted = 0 AND c2.deleted = 0
+																								GROUP BY a.accountid)
+																		AND ',col, ' = ''', val,''' )');
+	END IF;
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1 HAVING delay_day >= 60');
+	SET myquery = CONCAT(myquery, ' ORDER BY 1 DESC');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_detail_delay_with_count
+DELIMITER //
+CREATE PROCEDURE `dsa_support_detail_delay_with_count`(
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `delay_day` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(9000);
+	DECLARE subquery nvarchar(2000);
+	
+	SET myquery = CONCAT('SELECT DISTINCT c2.crmid ''c2.crmid'',
+										CONCAT(''['',c2.label, '' ('',acc.account_no, '')'', '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c2.crmid,''&app=SUPPORT)'') AS ''c2.label'',
+										
+										COUNT(DISTINCT CASE WHEN t.ticketid IS NOT NULL AND c.deleted = 0 THEN t.ticketid END) ''num_ticket''
+										
+								FROM vtiger_crmentity c2
+								
+								JOIN vtiger_account acc
+								ON c2.crmid = acc.accountid
+	
+								LEFT JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.parent_id = c2.crmid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON t.ticketid = c.crmid
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+												 
+								WHERE 1=1');
+							
+
+	
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+
+	
+
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1');
+	SET myquery = CONCAT(myquery, ' ORDER BY 1 DESC');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_location
+DELIMITER //
+CREATE PROCEDURE `dsa_support_location`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	SET myquery = CONCAT('SELECT tcf.cf_893, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+									 
+								WHERE 1=1');
+							
+
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_month
+DELIMITER //
+CREATE PROCEDURE `dsa_support_month`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CONCAT(Month(c.createdtime),''/'', Year(c.createdtime)) month, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+																 
+								WHERE 1=1');
+								
+								
+	SET myquery_2 = CONCAT('SELECT CONCAT(Month(c.modifiedtime),''/'', Year(c.modifiedtime)) month, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã đóng''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' THEN ''Mở''
+													WHEN status = ''Wait For Response'' THEN ''Đợi phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+								FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+																		 
+								WHERE 1=1');
+							
+
+	SET myquery_1 = CONCAT(myquery_1, ' AND c.deleted = ''0''');
+	SET myquery_1 = CONCAT(myquery_1, ' AND c2.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c2.deleted = ''0''');	
+		
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.cf_891 = ''',account_status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.cf_891 = ''',account_status,'''');
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.status = ''',status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.ticketid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery_1 = CONCAT(myquery_1, ' GROUP BY 1 ORDER BY YEAR(c.createdtime), MONTH(c.createdtime)');
+	SET myquery_2 = CONCAT(myquery_2, ' GROUP BY 1 ORDER BY YEAR(c.modifiedtime), MONTH(c.modifiedtime)');
+	
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_priority
+DELIMITER //
+CREATE PROCEDURE `dsa_support_priority`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	SET myquery = CONCAT('SELECT t.priority, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+
+															 
+								WHERE 1=1');
+							
+
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+			
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_quarter
+DELIMITER //
+CREATE PROCEDURE `dsa_support_quarter`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CONCAT(YEAR(c.createdtime),'' - Q'', QUARTER(c.createdtime)) quarter, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+																	 
+								WHERE 1=1');
+								
+								
+	SET myquery_2 = CONCAT('SELECT CONCAT(YEAR(c.modifiedtime),'' - Q'', QUARTER(c.modifiedtime)) quarter, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã đóng''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' THEN ''Mở''
+													WHEN status = ''Wait For Response'' THEN ''Đợi phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+								FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+							
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+																		 
+								WHERE 1=1');
+							
+
+	SET myquery_1 = CONCAT(myquery_1, ' AND c.deleted = ''0''');
+	SET myquery_1 = CONCAT(myquery_1, ' AND c2.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c2.deleted = ''0''');
+
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.cf_891 = ''',account_status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.cf_891 = ''',account_status,'''');
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.status = ''',status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.ticketid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery_1 = CONCAT(myquery_1, ' GROUP BY 1 ORDER BY YEAR(c.createdtime),QUARTER(c.createdtime)');
+	SET myquery_2 = CONCAT(myquery_2, ' GROUP BY 1 ORDER BY YEAR(c.modifiedtime),QUARTER(c.modifiedtime)');
+	
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_status
+DELIMITER //
+CREATE PROCEDURE `dsa_support_status`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	SET myquery = CONCAT('SELECT t.status, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+																	 
+								WHERE 1=1');
+							
+
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+			
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1 ORDER BY 2 DESC,1');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_total_support
+DELIMITER //
+CREATE PROCEDURE `dsa_support_total_support`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+
+								
+								WHERE 1=1');
+	
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_total_support_closed
+DELIMITER //
+CREATE PROCEDURE `dsa_support_total_support_closed`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+								
+								WHERE 1=1 AND t.status=''Đã hoàn thành''');
+	
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_total_support_open
+DELIMITER //
+CREATE PROCEDURE `dsa_support_total_support_open`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+								WHERE 1=1 AND t.status=''Đang mở''');
+	
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+			
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_user
+DELIMITER //
+CREATE PROCEDURE `dsa_support_user`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	SET myquery = CONCAT('SELECT u.user_name, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+												 
+								WHERE 1=1');
+							
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0''');
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		SET myquery = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	ELSEIF timetype = 1  AND start_date IS NOT NULL AND end_date IS NOT NULL THEN
+		  SET myquery = CONCAT(myquery,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' ');
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+		
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND a.cf_891 = ''',account_status,'''');	
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery = CONCAT(myquery, ' GROUP BY 1 ORDER BY 2 DESC,1');
+
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_support_year
+DELIMITER //
+CREATE PROCEDURE `dsa_support_year`(
+	IN `timetype` INT,
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `account_status` VARCHAR(50),
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `status` VARCHAR(50),
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery_1 nvarchar(4000);
+	DECLARE myquery_2 nvarchar(4000);
+	
+	
+	SET myquery_1 = CONCAT('SELECT CAST(Year(c.createdtime) AS CHAR) year, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã hoàn thành''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' OR status = ''Mở'' THEN ''Đang mở''
+													WHEN status = ''Wait For Response'' THEN ''Chờ phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+											FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+																		 
+								WHERE 1=1');
+								
+								
+	SET myquery_2 = CONCAT('SELECT CAST(Year(c.modifiedtime) AS CHAR) year, COUNT(DISTINCT t.ticketid) num
+								FROM vtiger_crmentity c 
+	
+								JOIN (SELECT ticketid,ticket_no,parent_id,
+												(CASE WHEN priority= ''High'' THEN ''Cao''
+													WHEN priority != '''' THEN priority
+													ELSE ''Không xác định'' END) AS ''priority'',
+													
+												(CASE WHEN status = ''Closed'' THEN ''Đã đóng''
+													WHEN status = ''In Progress'' THEN ''Đang xử lý''
+													WHEN status = ''Open'' THEN ''Mở''
+													WHEN status = ''Wait For Response'' THEN ''Đợi phản hồi''
+													WHEN status IS NOT NULL THEN status
+													ELSE ''Không xác định'' END) AS ''status'',
+												category,title
+								FROM vtiger_troubletickets) t
+								ON t.ticketid = c.crmid
+								
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = t.parent_id
+								
+								LEFT JOIN vtiger_users u
+								ON u.id = c.smownerid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+																		 
+								WHERE 1=1');
+							
+
+	SET myquery_1 = CONCAT(myquery_1, ' AND c.deleted = ''0''');
+	SET myquery_1 = CONCAT(myquery_1, ' AND c2.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c.deleted = ''0''');
+	SET myquery_2 = CONCAT(myquery_2, ' AND c2.deleted = ''0''');
+
+	
+	
+	IF (start_date IS NOT NULL AND end_date IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery_2 = CONCAT(myquery_2,' AND DATE(c.modifiedtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''',account_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(account_status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND a.cf_891 = ''',account_status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND a.cf_891 = ''',account_status,'''');
+	END IF;
+		
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND c.smownerid = ''',user_assign,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ug.groupid = ''',dept_id,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND ug.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (status IS NOT NULL) THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.status = ''',status,'''');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.status = ''',status,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.ticketid = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.ticketid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND t.parent_id = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND t.parent_id = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label' AND col != 'c2.label')  THEN
+		SET myquery_1 = CONCAT(myquery_1,' AND ',col, ' = ''', val,''' ');
+		SET myquery_2 = CONCAT(myquery_2,' AND ',col, ' = ''', val,''' ');
+	END IF;
+	
+	SET myquery_1 = CONCAT(myquery_1, ' GROUP BY 1 ORDER BY 1');
+	SET myquery_2 = CONCAT(myquery_2, ' GROUP BY 1 ORDER BY 1');
+	
+	
+	
+	IF (timetype = 0 OR timetype IS NULL) THEN
+		SELECT myquery_1;
+		SET @SQL := myquery_1;
+	 	PREPARE my_query1 FROM @SQL;
+		EXECUTE my_query1;
+	ELSEIF (timetype = 1) THEN
+		SELECT myquery_2;
+		SET @SQL := myquery_2;
+	 	PREPARE my_query2 FROM @SQL;
+		EXECUTE my_query2;
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_activity_day
+DELIMITER //
+CREATE PROCEDURE `dsa_user_activity_day`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+
+	
+	
+	SET myquery = CONCAT('SELECT CONCAT(DAY(a.date_start),''/'',MONTH(a.date_start),''/'', YEAR(a.date_start)) AS ''date'', COUNT(DISTINCT a.activityid) AS ''SL_activity''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+																
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	
+	
 	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-		SET QUERY2 = CONCAT(QUERY2,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-		SET QUERY3 = CONCAT(QUERY3,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-		SET QUERY4 = CONCAT(QUERY4,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND t.project = ''', project_id, '''');
-		SET QUERY2 = CONCAT(QUERY2,' AND t.project = ''', project_id, '''');
-		SET QUERY3 = CONCAT(QUERY3,' AND t.project = ''', project_id, '''');
-		SET QUERY4 = CONCAT(QUERY4,' AND t.project = ''', project_id, '''');
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
 	END IF;
 	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-		SET QUERY2 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-		SET QUERY3 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-		SET QUERY4 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
 	END IF;
 	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND ',col, ' = ''', val,''' ');
-		SET QUERY2 = CONCAT(QUERY2,' AND ',col, ' = ''', val,''' ');
-		SET QUERY3 = CONCAT(QUERY3,' AND ',col, ' = ''', val,''' ');
-		SET QUERY4 = CONCAT(QUERY4,' AND ',col, ' = ''', val,''' ');
-	END IF;	
 	
-	SET QUERY1 = CONCAT(QUERY1,' GROUP BY 1 ORDER BY 1');
-	SET QUERY2 = CONCAT(QUERY2,' GROUP BY 1 ORDER BY 1');	
-	SET QUERY3 = CONCAT(QUERY3,' GROUP BY 1 ORDER BY YEAR(t.finishedDate), MONTH(t.finishedDate)');
-	SET QUERY4 = CONCAT(QUERY4,' GROUP BY 1 ORDER BY YEAR(t.finishedDate), MONTH(t.finishedDate), DAY(t.finishedDate)');
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
 	
-	/*Hiển thị tất cả*/
-	IF (year_ IS NULL) AND (month_ IS NULL) AND (day_ IS NULL) THEN
 	
-	SET @SQL1 := QUERY1;
- 	PREPARE my_query1 FROM @SQL1;
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY YEAR(a.date_start),MONTH(a.date_start),DAY(a.date_start)');
+	
+	
+
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
 	EXECUTE my_query1;
-	END IF;
-	
-	/*Lọc theo từng năm*/
-	IF (year_ IS NOT NULL) THEN
-	SET @SQL2 := QUERY2;
- 	PREPARE my_query2 FROM @SQL2;
-	EXECUTE my_query2;
-	END IF;
-	
-	/*Lọc theo từng tháng*/
-	IF (month_ IS NOT NULL) THEN
-	SET @SQL3 := QUERY3;
- 	PREPARE my_query3 FROM @SQL3;
-	EXECUTE my_query3;
-	END IF;
-		
-	/*Lọc theo từng ngày*/
-	IF (day_ IS NOT NULL) THEN
-	SET @SQL4 := QUERY4;
- 	PREPARE my_query4 FROM @SQL4;
-	EXECUTE my_query4;
-	END IF;
-		
+
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_taskdone_detail_pie
+-- Dumping structure for procedure crm.dsa_user_activity_detail
 DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_detail_pie`(
+CREATE PROCEDURE `dsa_user_activity_detail`(
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
 	IN `dept_id` INT,
 	IN `col` VARCHAR(50),
 	IN `val` VARCHAR(50)
 )
 BEGIN
-	DECLARE myquery nvarchar(2000);
-   SET myquery = CONCAT(
-		'SELECT t.TT_MORONG AS Trang_thai,COUNT(t.id) AS SL_Task
-		FROM (SELECT *,
-				   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-							WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																								OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-							WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																								OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-										
-							WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-							WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-							ELSE '''' END) AS TT_MORONG
-				FROM zt_task) t
-		JOIN zt_user u
-		ON u.account = t.finishedBy
-		LEFT JOIN zt_dept d
-		ON u.dept = d.id
-		WHERE 1=1'
-	);
 
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-		/*Lọc theo tên nhân viên*/
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND t.finishedBy = ''', username, '''');							
-	END IF;
-	
-	/*Lọc các task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;
-
-	/*Lọc các task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery,' GROUP BY t.TT_MORONG');
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;		
-			
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskdone_percentage
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_percentage`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT CONCAT(COUNT(IF(t.finishedBy != '''',1,NULL)),'' ('',ROUND((COUNT(IF(t.finishedBy!='''',1,NULL))/COUNT(t.openedBy))*100,2),''%'','')'') AS Do_hoan_thanh_task_da_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.openedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE 1=1');
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND u.account = ''', username, '''');							
-	END IF;
-	
-	/*Lọc các task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.openedDate ) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF col IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
+	DECLARE myquery nvarchar(4000);
 	
 	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;
-	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskdone_total
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskdone_total`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	SET myquery = CONCAT('SELECT COUNT(t.id) AS So_luong_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-							JOIN zt_user u
-							ON u.account = t.finishedBy
-							LEFT JOIN zt_dept d
-							ON u.dept = d.id
-							WHERE 1=1');
-							
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-	/*Lọc SL task theo tên NV*/
-	IF (username IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.finishedBy = ''', username, '''');							
-   END IF;
-   
-	/*Lọc SL task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.finishedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;					
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;		
-			
-
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskopened_bar
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskopened_bar`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT t.openedBy AS NV_Account, u.realname AS name, COUNT(t.id) AS So_luong_task_hoan_thanh
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.openedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE 1=1');
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND t.openedBy = ''', username, '''');							
-	END IF;
-	
-	/*Lọc các task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.openedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery, ' GROUP BY t.openedBy ORDER BY COUNT(t.id) DESC, t.openedBy');
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;		
-			
-	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskopened_bytime_line
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskopened_bytime_line`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50),
-	IN `year_` ENUM('Y','N'),
-	IN `month_` ENUM('Y','N'),
-	IN `day_` ENUM('Y','N')
-)
-BEGIN
-	DECLARE QUERY1 nvarchar(2000);
-	DECLARE QUERY2 nvarchar(2000);
-	DECLARE QUERY3 nvarchar(2000);
-	DECLARE QUERY4 nvarchar(2000);
-	
-	/*Chọn các task theo thời gian tạo*/
-	SET QUERY1 = CONCAT('SELECT DATE(t.openedDate) AS thoi_gian, COUNT(t.id) AS SL_task_da_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.openedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 ');
-							
-	SET QUERY2 = CONCAT('SELECT CAST(Year(t.openedDate) AS CHAR) AS thoi_gian, COUNT(t.id) AS SL_task_da_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.openedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 ');
+	SET myquery = CONCAT('SELECT DISTINCT c.crmid, CONCAT(''['',c.label, '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Calendar&view=Detail&record='',c.crmid,'')'') AS ''c.label'',
+											u.user_name, a.activitytype, 
+											a.status,
+											DATE(c.createdtime),a.date_start,a.due_date,DATE(c.modifiedtime),
+											c2.crmid,
+											CASE WHEN c2.setype = ''Accounts'' THEN CONCAT(''['',c2.label, '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Accounts&view=Detail&record='',c2.crmid,''&app=SUPPORT)'')
+													ELSE '''' END AS ''c2.label''
+												
+												
+												
+								FROM vtiger_users u
 								
-	SET QUERY3 = CONCAT('SELECT CONCAT(Month(t.openedDate),''/'', Year(t.openedDate)) AS thoi_gian, COUNT(t.id) AS SL_task_da_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.openedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 ');	
-									
-	SET QUERY4 = CONCAT('SELECT CONCAT(Day(t.openedDate),''/'',Month(t.openedDate),''/'', Year(t.openedDate)) AS thoi_gian, COUNT(t.id) AS SL_task_da_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-								JOIN zt_user u
-								ON u.account = t.openedBy
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id
-								WHERE t.deleted = ''0'' AND u.deleted = ''0'' AND t.parent !=-1 ');
-										
-	/*Lọc SL task theo tên NV*/
-	IF (username IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND t.openedBy = ''', username, '''');
-		SET QUERY2 = CONCAT(QUERY2,' AND t.openedBy = ''', username, '''');
-		SET QUERY3 = CONCAT(QUERY3,' AND t.openedBy = ''', username, '''');
-		SET QUERY4 = CONCAT(QUERY4,' AND t.openedBy = ''', username, '''');									
-   END IF;										
-																													
-	/*Lọc SL task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND DATE(t.openedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-		SET QUERY2 = CONCAT(QUERY2,' AND DATE(t.openedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-		SET QUERY3 = CONCAT(QUERY3,' AND DATE(t.openedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-		SET QUERY4 = CONCAT(QUERY4,' AND DATE(t.openedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND t.project = ''', project_id, '''');
-		SET QUERY2 = CONCAT(QUERY2,' AND t.project = ''', project_id, '''');
-		SET QUERY3 = CONCAT(QUERY3,' AND t.project = ''', project_id, '''');
-		SET QUERY4 = CONCAT(QUERY4,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-		SET QUERY2 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-		SET QUERY3 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-		SET QUERY4 = CONCAT(QUERY1,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET QUERY1 = CONCAT(QUERY1,' AND ',col, ' = ''', val,''' ');
-		SET QUERY2 = CONCAT(QUERY2,' AND ',col, ' = ''', val,''' ');
-		SET QUERY3 = CONCAT(QUERY3,' AND ',col, ' = ''', val,''' ');
-		SET QUERY4 = CONCAT(QUERY4,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET QUERY1 = CONCAT(QUERY1,' GROUP BY 1 ORDER BY 1');
-	SET QUERY2 = CONCAT(QUERY2,' GROUP BY 1 ORDER BY 1');	
-	SET QUERY3 = CONCAT(QUERY3,' GROUP BY 1 ORDER BY YEAR(t.openedDate), MONTH(t.openedDate)');
-	SET QUERY4 = CONCAT(QUERY4,' GROUP BY 1 ORDER BY YEAR(t.openedDate), MONTH(t.openedDate), DAY(t.openedDate)');
-	
-	/*Hiển thị tất cả*/
-	IF (year_ IS NULL) AND (month_ IS NULL) AND (day_ IS NULL) THEN
-	SET @SQL1 := QUERY1;
- 	PREPARE my_query1 FROM @SQL1;
-	EXECUTE my_query1;		
-			
-	END IF;
-	
-	/*Lọc theo từng năm*/
-	IF (year_ IS NOT NULL) THEN
-	SET @SQL2 := QUERY2;
- 	PREPARE my_query2 FROM @SQL2;
-	EXECUTE my_query2;	
-	END IF;
-	
-	/*Lọc theo từng tháng*/
-	IF (month_ IS NOT NULL) THEN
-	SET @SQL3 := QUERY3;
- 	PREPARE my_query3 FROM @SQL3;
-	EXECUTE my_query3;	
-	END IF;
-		
-	/*Lọc theo từng ngày*/
-	IF (day_ IS NOT NULL) THEN
-	SET @SQL4 := QUERY4;
- 	PREPARE my_query4 FROM @SQL4;
-	EXECUTE my_query4;	
-	END IF;
-		
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_taskopened_total
-DELIMITER //
-CREATE PROCEDURE `dsa_user_taskopened_total`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	SET myquery = CONCAT('SELECT COUNT(t.id) AS So_luong_task_da_tao
-							   FROM (SELECT *,
-									   (CASE WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline = ''0000-00-00'' THEN ''Không có deadline''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) > deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed > estimate))) THEN ''Nộp trễ''
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND (DATE(finishedDate) < deadline 
-																													OR (DATE(finishedDate) = deadline AND (consumed < estimate))) THEN ''Nộp sớm''
-															
-												WHEN DATE(finishedDate) != ''0000-00-00'' AND deadline != ''0000-00-00'' AND DATE(finishedDate) = deadline AND (consumed = estimate) THEN ''Nộp đúng giờ''
-												WHEN DATE(finishedDate) IS NULL THEN ''Không xác định được finishedDate''
-												ELSE '''' END) AS TT_MORONG
-									FROM zt_task) t
-							JOIN zt_user u
-							ON u.account = t.openedBy
-							LEFT JOIN zt_dept d
-							ON u.dept = d.id
-							WHERE 1=1');
-							
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND t.parent !=-1');
-	SET myquery = CONCAT(myquery, ' AND YEAR(t.finishedDate) != ''1970'' ');
-	
-	/*Lọc SL task theo tên NV*/
-	IF (username IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.openedBy = ''', username, '''');							
-   END IF;
-   
-	/*Lọc SL task theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND DATE(t.openedDate) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;					
-	
-	/*Lọc SL task theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;	
-END//
-DELIMITER ;
-
--- Dumping structure for procedure dsapms.dsa_user_total_bang
-DELIMITER //
-CREATE PROCEDURE `dsa_user_total_bang`(
-	IN `start_date` DATE,
-	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
-	IN `dept_id` INT,
-	IN `col` VARCHAR(50),
-	IN `val` VARCHAR(50)
-)
-BEGIN
-	DECLARE myquery nvarchar(2000);
-	SET myquery = CONCAT('SELECT COUNT(DISTINCT tm.account) as tong_SL_nhan_vien
-								FROM zt_project p
-								JOIN zt_team tm
-								ON tm.root = p.id	
-								JOIN zt_user u
-								ON u.account = tm.account
-								LEFT JOIN zt_dept d
-								ON u.dept = d.id										 
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
 								WHERE 1=1');
+	
+	
 
-	SET myquery = CONCAT(myquery,' AND p.deleted = ''0''');
-	SET myquery = CONCAT(myquery,' AND p.deleted = ''0''');
-	SET myquery = CONCAT(myquery,' AND tm.type = ''project''');
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND DATE(a.due_date) != ''4031-02-23'' AND DATE(a.due_date) != ''4029-06-04'' AND DATE(a.due_date) != ''4032-07-09''');
 	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND u.account = ''', username, '''');							
-	END IF;
-	
-	
-	/*Lọc SL NV theo khoảng thời gian*/
 	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.join <= ''', end_date, ''' '); 
-	END IF;					
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+		
 	
-	/*Lọc SL NV theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND p.id = ''', project_id, '''');
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
 	END IF;
 	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
 	END IF;
 	
-	/*Lọc theo col,val*/	
-	IF (col IS NOT NULL) THEN
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
 		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
+	END IF;
+
+	SET myquery = CONCAT(myquery,' ORDER BY 1');
+	SELECT myquery;
 	SET @SQL := myquery;
- 	PREPARE my_query FROM @SQL;
-	EXECUTE my_query;	
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_without_task
+-- Dumping structure for procedure crm.dsa_user_activity_month
 DELIMITER //
-CREATE PROCEDURE `dsa_user_without_task`(
+CREATE PROCEDURE `dsa_user_activity_month`(
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
 	IN `dept_id` INT,
 	IN `col` VARCHAR(50),
 	IN `val` VARCHAR(50)
 )
 BEGIN
+
+	DECLARE myquery nvarchar(4000);
+	
+	
+	SET myquery = CONCAT('SELECT CONCAT(Month(a.date_start),''/'', Year(a.date_start)) AS ''date'', COUNT(DISTINCT a.activityid) AS ''SL_activity''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY YEAR(a.date_start), MONTH(a.date_start)');
+	
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_activity_quarter
+DELIMITER //
+CREATE PROCEDURE `dsa_user_activity_quarter`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+
+	
+	
+	SET myquery = CONCAT('SELECT CONCAT(YEAR(a.date_start),'' - Q'', QUARTER(a.date_start)) AS ''date'', COUNT(DISTINCT a.activityid) AS ''SL_activity''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY YEAR(a.date_start), QUARTER(a.date_start)');
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_activity_year
+DELIMITER //
+CREATE PROCEDURE `dsa_user_activity_year`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+	
+	
+	SET myquery = CONCAT('SELECT CAST(Year(date_start) AS CHAR) AS ''date'', COUNT(DISTINCT a.activityid) AS ''SL_activity''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+		
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY 1');
+
+	
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_all
+DELIMITER //
+CREATE PROCEDURE `dsa_user_all`(
+	IN `id_proc` VARCHAR(50),
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+   
+	IF id_proc = 'ov_user' THEN
+		CALL dsa_user_total(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_activity' THEN
+		CALL dsa_user_total_activity(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_salesorder' THEN
+		CALL dsa_user_total_salesorder(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_task_created' THEN
+		CALL dsa_user_total_task_created(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_task_finished' THEN
+		CALL dsa_user_total_task_finished(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'ov_task_delay' THEN
+		CALL dsa_user_total_task_delay(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	
+	
+	IF id_proc = 'user_salesorder' THEN
+		CALL dsa_user_salesorder(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_task_created' THEN
+		CALL dsa_user_task_created(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_task_finished' THEN
+		CALL dsa_user_task_finished(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	
+	
+	
+		
+	IF id_proc = 'activity_detail' THEN
+		CALL dsa_user_activity_detail(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+		
+	IF id_proc = 'without_activity' THEN
+		CALL dsa_user_without_activity(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+		
+	IF id_proc = 'task_delay_detail' THEN
+		CALL dsa_user_task_delay_detail(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+		
+	IF id_proc = 'without_login' THEN
+		CALL dsa_user_without_login(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	
+	IF id_proc = 'user_activity_day' THEN
+		CALL dsa_user_activity_day(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_activity_month' THEN
+		CALL dsa_user_activity_month(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_activity_quarter' THEN
+		CALL dsa_user_activity_quarter(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_activity_year' THEN
+		CALL dsa_user_activity_year(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+	
+	IF id_proc = 'user_productivity' THEN
+		CALL dsa_user_productivity(start_date,end_date,account_id,user_assign,dept_id,col,val);
+	END IF;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_ddl_account
+DELIMITER //
+CREATE PROCEDURE `dsa_user_ddl_account`(
+	IN `id_dept` INT,
+	IN `id_user` INT
+)
+BEGIN
 	DECLARE myquery nvarchar(2000);
 	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery = CONCAT('SELECT u.account 
-								FROM zt_user u 
-								INNER JOIN zt_task t ON t.assignedTo = u.account 
-								WHERE 1=1 ');
-	SET myquery = CONCAT(myquery, ' AND t.deleted = ''0''');	
-	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
+	SET myquery = CONCAT('SELECT DISTINCT c2.crmid, CONCAT(c2.label,'' ('', acc.account_no, '')'')
+								FROM vtiger_account acc 
+
+								JOIN vtiger_crmentity c2
+								ON c2.crmid = acc.accountid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON c2.crmid = sa.crmid
+								
+								LEFT JOIN vtiger_crmentity c
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN  vtiger_activity a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_users u
+								ON c.smownerid = u.id
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+								LEFT JOIN vtiger_groups g 								
+								ON ug.groupid = g.groupid
+								
+								WHERE c2.deleted = ''0''');
+								
 	
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery = CONCAT(myquery,' AND u.account = ''', username, '''');							
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',id_dept,'''');
 	END IF;
 	
-	/*Lọc theo khoảng thời gian*/
-	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.assignedDate BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
-	END IF;	
 	
-	/*Lọc theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND t.project = ''', project_id, '''');
+	IF(id_user IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND u.id = ''',id_user,'''');
 	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
-	END IF;	
-	
-	SET myquery = CONCAT(myquery, ' GROUP BY u.account HAVING COUNT(t.id) = 0');
-	
+	SET myquery = CONCAT (myquery,' ORDER BY c2.label');							
+	SELECT myquery;
 	SET @SQL := myquery;
  	PREPARE my_query FROM @SQL;
 	EXECUTE my_query;
@@ -3964,13 +10760,1191 @@ BEGIN
 END//
 DELIMITER ;
 
--- Dumping structure for procedure dsapms.dsa_user_without_task_
+-- Dumping structure for procedure crm.dsa_user_ddl_all
 DELIMITER //
-CREATE PROCEDURE `dsa_user_without_task_`(
+CREATE PROCEDURE `dsa_user_ddl_all`(
+	IN `id_ddl` VARCHAR(50),
+	IN `id_account` INT,
+	IN `id_dept` INT,
+	IN `id_user` INT
+)
+BEGIN
+	IF id_ddl = 'ddl_account' THEN
+		CALL dsa_user_ddl_account(id_dept,id_user);
+	END IF;
+	
+	IF id_ddl = 'ddl_dept' THEN
+		CALL dsa_user_ddl_dept(id_account,id_user);
+	END IF;
+
+	IF id_ddl = 'ddl_user_assign' THEN
+		CALL dsa_user_ddl_user_assign(id_account,id_dept);
+	END IF;
+	
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_ddl_dept
+DELIMITER //
+CREATE PROCEDURE `dsa_user_ddl_dept`(
+	IN `id_account` INT,
+	IN `id_user` INT
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+
+	SET myquery = CONCAT('SELECT DISTINCT g.groupid, g.groupname 
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								
+								LEFT JOIN vtiger_activity a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+								LEFT JOIN vtiger_groups g 								
+								ON ug.groupid = g.groupid
+								
+								WHERE g.groupid IS NOT NULL
+								');
+	
+	
+	IF(id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',id_account,'''');
+	END IF;
+	
+	
+	IF(id_user IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND u.id = ''',id_user,'''');
+	END IF;
+	
+	
+	
+	SET myquery = CONCAT(myquery,' ORDER BY g.groupname');
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_ddl_user_assign
+DELIMITER //
+CREATE PROCEDURE `dsa_user_ddl_user_assign`(
+	IN `id_account` INT,
+	IN `id_dept` INT
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT DISTINCT u.id, CONCAT(u.last_name,'' '', u.first_name, '' ('', u.user_name, '')'') AS ''NV_assign''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								
+								LEFT JOIN vtiger_activity a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = u.id
+								
+								LEFT JOIN vtiger_groups g 								
+								ON ug.groupid = g.groupid
+								
+								
+								WHERE u.deleted = ''0'' and u.status = ''Active''');
+	
+	
+	IF(id_account IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',id_account,'''');
+	END IF;
+	
+	
+	IF(id_dept IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',id_dept,'''');
+	END IF;	
+		
+				
+	SET myquery = CONCAT(myquery,' ORDER BY u.user_name');
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_productivity
+DELIMITER //
+CREATE PROCEDURE `dsa_user_productivity`(
 	IN `start_date` DATE,
 	IN `end_date` DATE,
-	IN `project_id` INT,
-	IN `username` VARCHAR(50),
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	
+	SET myquery = CONCAT('SELECT CONCAT(Day(a.due_date),''/'',Month(a.due_date),''/'', Year(a.due_date)) AS DATE,
+				 							CONCAT(ROUND((SUM(a.duration_hours)+SUM(a.duration_minutes)/60)/(8*COUNT(DISTINCT u.user_name))*100,2),''%'') AS Nang_suat				
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								WHERE 1=1');
+							
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');	
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND a.due_date IS NOT NULL');
+	SET myquery = CONCAT(myquery,	' AND (a.status = ''Đã hoàn thành'' OR a.status = ''Đã tổ chức'') ');
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.due_date) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SET myquery = CONCAT(myquery, ' GROUP BY 1 ORDER BY YEAR(a.due_date), MONTH(a.due_date), DAY(a.due_date)');
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_salesorder
+DELIMITER //
+CREATE PROCEDURE `dsa_user_salesorder`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+	
+	
+	SET myquery = CONCAT('SELECT c.smownerid,u.user_name AS ''NV_assign'', COUNT(DISTINCT so.salesorderid) 
+								FROM vtiger_users u	
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								LEFT JOIN vtiger_salesorder so
+								ON c.crmid = so.salesorderid 	
+								LEFT JOIN vtiger_crmentity c2
+								ON so.accountid = c2.crmid 		
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+																		 
+								WHERE 1=1');
+							
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery, ' AND c2.deleted = ''0'''); 
+
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SET myquery = CONCAT(myquery, ' GROUP BY 1 ORDER BY 3 DESC,2');
+	
+
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_task_created
+DELIMITER //
+CREATE PROCEDURE `dsa_user_task_created`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+
+	
+	
+	SET myquery = CONCAT('SELECT c.smownerid,u.user_name AS ''NV_assign'', COUNT(DISTINCT a.activityid)
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY 3 DESC,2');
+
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_task_delay_detail
+DELIMITER //
+CREATE PROCEDURE `dsa_user_task_delay_detail`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+	
+	
+	SET myquery = CONCAT('SELECT DISTINCT c.crmid, CONCAT(''['',c.label, '' ]'',''(http://crm.fastdn.com.vn/index.php?module=Calendar&view=Detail&record='',c.crmid,'')'') AS ''c.label'',
+											u.user_name,
+											a.status,
+											DATEDIFF(DATE(NOW()), DATE(a.due_date)) AS delay_days
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND (a.status != ''Đã hoàn thành'' AND a.status != ''Đã tổ chức'')');
+	
+	SET myquery = CONCAT(myquery,' AND DATEDIFF(DATE(NOW()), DATE(a.due_date)) > 0');
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SET myquery = CONCAT(myquery,' ORDER BY delay_days DESC');
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_task_finished
+DELIMITER //
+CREATE PROCEDURE `dsa_user_task_finished`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+
+	
+	SET myquery = CONCAT('SELECT c.smownerid, u.user_name AS ''NV_assign'', COUNT(DISTINCT IF(a.status = ''Đã hoàn thành'' OR a.status = ''Đã tổ chức'',a.activityid,NULL))
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery,' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.due_date) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;	
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SET myquery = CONCAT (myquery,' GROUP BY 1 ORDER BY 3 DESC,2');
+
+	
+	
+	
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_total
+DELIMITER //
+CREATE PROCEDURE `dsa_user_total`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT u.user_name) 
+								FROM vtiger_users u
+									
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN vtiger_activity a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+																					 
+								WHERE 1=1');
+							
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND DATE(date_entered) <= ''', end_date, ''' '); 
+	END IF;	
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_total_activity
+DELIMITER //
+CREATE PROCEDURE `dsa_user_total_activity`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+
+	
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT a.activityid) AS ''SL_activity''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+		
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_total_salesorder
+DELIMITER //
+CREATE PROCEDURE `dsa_user_total_salesorder`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+	
+	
+	
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT so.salesorderid) AS ''SL_salesorder''
+								FROM vtiger_users u	
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								LEFT JOIN vtiger_salesorder so
+								ON c.crmid = so.salesorderid	
+								LEFT JOIN vtiger_crmentity c2
+								ON so.accountid = c2.crmid 
+										
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+																		 
+								WHERE 1=1');
+							
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0''');	
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(c.createdtime) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+		
+		
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SELECT myquery;
+	SET @SQL := myquery;
+ 	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;	
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_total_task_created
+DELIMITER //
+CREATE PROCEDURE `dsa_user_total_task_created`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+
+	
+	
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT a.activityid) AS ''SL_task''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+													
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								
+								WHERE 1=1');
+	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND u.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+
+	
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+		
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_total_task_delay
+DELIMITER //
+CREATE PROCEDURE `dsa_user_total_task_delay`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+
+	DECLARE myquery nvarchar(4000);
+	
+	
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT a.activityid) AS ''SL_task_delay''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND (a.status != ''Đã hoàn thành'' AND a.status != ''Đã tổ chức'')');
+
+	SET myquery = CONCAT(myquery,' AND DATEDIFF(DATE(NOW()), DATE(a.due_date)) > 0');
+
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SET myquery = CONCAT(myquery,' ORDER BY 1');
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_total_task_finished
+DELIMITER //
+CREATE PROCEDURE `dsa_user_total_task_finished`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(4000);
+
+
+	
+	SET myquery = CONCAT('SELECT COUNT(DISTINCT IF(a.status = ''Đã hoàn thành'' OR a.status = ''Đã tổ chức'',a.activityid,NULL)) AS ''SL_task_finished''
+								FROM vtiger_users u
+								
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+																
+								LEFT JOIN (SELECT activityid, subject, activitytype,date_start,due_date,time_start,time_end,
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_hours IS NULL THEN 0 ELSE duration_hours END AS ''duration_hours'',
+												CASE WHEN time_end = '''' OR time_end =''00:00:00'' OR duration_minutes IS NULL THEN 0 ELSE duration_minutes END AS ''duration_minutes'',
+												CASE WHEN status=''In Progress'' THEN ''Đang xử lý''
+														WHEN status=''Completed'' OR status=''Hoàn thành'' THEN ''Đã hoàn thành''
+														WHEN status=''Pending Input'' THEN ''Đang chờ xử lý''
+														WHEN status=''Deferred'' THEN ''Trì hoãn''
+														WHEN status=''Planned'' THEN ''Đã lên kế hoạch''
+														WHEN eventstatus=''Planned'' THEN ''Lên kế hoạch''
+														WHEN eventstatus=''Held'' OR eventstatus=''Đã tổ chức'' THEN ''Đã tổ chức''
+														WHEN eventstatus=''Not Held'' THEN ''Không tổ chức''
+														ELSE ''Không xác định'' END AS ''status''
+										FROM vtiger_activity ) a
+								ON c.crmid = a.activityid
+								
+								LEFT JOIN vtiger_seactivityrel sa
+								ON sa.activityid = c.crmid
+								
+								LEFT JOIN vtiger_crmentity c2
+								ON c2.crmid = sa.crmid
+								
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								WHERE 1=1');
+	
+	
+
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery,' AND c.deleted = ''0''');
+	SET myquery = CONCAT(myquery,' AND c2.deleted = ''0''');
+
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(a.due_date) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+	
+	
+	IF(account_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''',account_id,'''');
+	END IF;
+	
+	
+	IF(user_assign IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND c.smownerid = ''',user_assign,'''');
+	END IF;
+	
+	
+	IF(dept_id IS NOT NULL) THEN
+		SET myquery = CONCAT(myquery,' AND g.groupid = ''',dept_id,'''');
+	END IF;
+	
+	
+	IF (col IS NOT NULL) AND (col = 'c.label') THEN
+		SET myquery = CONCAT(myquery,' AND c.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col = 'c2.label') THEN
+		SET myquery = CONCAT(myquery,' AND c2.crmid = ''', val,''' ');
+	END IF;
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label')  THEN
+		SET myquery = CONCAT(myquery,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+
+	SELECT myquery;
+	SET @SQL := myquery;
+	PREPARE my_query1 FROM @SQL;
+	EXECUTE my_query1;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_without_activity
+DELIMITER //
+CREATE PROCEDURE `dsa_user_without_activity`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` INT,
 	IN `dept_id` INT,
 	IN `col` VARCHAR(50),
 	IN `val` VARCHAR(50)
@@ -3978,63 +11952,1436 @@ CREATE PROCEDURE `dsa_user_without_task_`(
 BEGIN
 	DECLARE myquery nvarchar(2000);
 	DECLARE myquery1 nvarchar(2000);
-	DECLARE myquery2 nvarchar(2000);
-	
-	/* Hiển thị account NV, tên NV và tổng số dự án hoàn thành */
-	SET myquery1 = 'WITH active_user
-								AS (SELECT 
-										 u.account AS ''u.account''
-									 FROM
-										 zt_user u 
-								  	 WHERE
-									 	 u.deleted = ''0'' AND 1=1 ';
+					
+	SET myquery  = CONCAT('SELECT u.user_name
+								FROM vtiger_users u
+								LEFT JOIN vtiger_crmentity c
+								ON c.smownerid = u.id
+								LEFT JOIN vtiger_activity a
+								ON c.crmid = a.activityid
+									
+								LEFT JOIN vtiger_users2group ug
+								ON ug.userid = c.smownerid
+								
+								LEFT JOIN vtiger_groups g
+								ON g.groupid = ug.groupid
+								
+								
+								WHERE 1=1');
+							
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	SET myquery = CONCAT(myquery, ' AND c.deleted = ''0''');
 
-	/* Lọc theo tên NV */							
-	IF (username) IS NOT NULL THEN
-		SET myquery1 = CONCAT(myquery1,' AND u.account = ''', username, '''');							
-	END IF;
-	
-	/*Lọc SL task theo department*/
-	IF (dept_id IS NOT NULL) THEN
-		SET myquery1 = CONCAT(myquery1,' AND u.dept = ''', dept_id, '''');
-	END IF;
-	
-	SET myquery1 = CONCAT(myquery1,' ), ');
-	
-	SET myquery2 = ' busy_user 
-								 AS (SELECT 
-										 t.assignedTo AS ''t.assignedTo''
-									 FROM
-										 zt_task t
-								  	 WHERE
-									 	 t.deleted = ''0'' AND t.assignedTo <> '' AND 1=1 ';
-
-	/*Lọc theo khoảng thời gian*/
+		
 	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
-		SET myquery2 = CONCAT(myquery2,' AND t.assignedDate BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+		SET myquery  = CONCAT(myquery,' AND DATE(a.date_start) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+
+	
+	SET myquery  = CONCAT(myquery , ' GROUP BY u.user_name ');
+	
+	SET myquery1 = CONCAT ('SELECT u.user_name,
+											GROUP_CONCAT(DISTINCT CONCAT(Day(l.login_time),''/'',Month(l.login_time),''/'', Year(l.login_time)) ORDER BY YEAR(l.login_time), MONTH(l.login_time), DAY(l.login_time) SEPARATOR ''\n'')
+									FROM vtiger_users u
+									LEFT JOIN vtiger_loginhistory l
+									ON l.user_name = u.user_name
+										
+									LEFT JOIN vtiger_users2group ug
+									ON ug.userid = u.id
+								
+									LEFT JOIN vtiger_groups g
+									ON g.groupid = ug.groupid
+								
+									WHERE u.deleted =''0'' AND u.status = ''Active'' 
+									AND u.user_name NOT IN  (',myquery,')');	
+
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) THEN
+		SET myquery1  = CONCAT(myquery1,' AND DATE(l.login_time) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
 	END IF;	
 	
-	/*Lọc theo project*/
-	IF (project_id IS NOT NULL) THEN
-		SET myquery2 = CONCAT(myquery2,' AND t.project = ''', project_id, '''');
+	
+	IF (user_assign IS NOT NULL) THEN
+		SET myquery1 = CONCAT(myquery1,' AND u.id = ''', user_assign, '''');
 	END IF;
 	
 	
-	/*Lọc theo col,val*/
-	IF (col IS NOT NULL) THEN
-		SET myquery2 = CONCAT(myquery2,' AND ',col, ' = ''', val,''' ');
-	END IF;	
+	IF (dept_id IS NOT NULL) THEN
+		SET myquery1 = CONCAT(myquery1,' AND g.groupid = ''',dept_id, '''');
+	END IF;
+		
 	
-	SET myquery2 = CONCAT(myquery2, ' GROUP BY t.assignedTo HAVING COUNT(t.id) > 0) ');
-	
-	SET myquery = CONCAT(myquery1, myquery2, ' SELECT * FROM active_user');
-	
-	SELECT myquery;
-	SET @SQL := myquery;
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label') THEN
+		SET myquery1 = CONCAT(myquery1,' AND ',col, ' = ''', val,''' ');
+	END IF;
+
+	SET myquery1 = CONCAT(myquery1,' GROUP BY u.user_name ORDER BY u.user_name');
+	SELECT myquery1;
+	SET @SQL := myquery1;
  	PREPARE my_query FROM @SQL;
 	EXECUTE my_query;
-
 	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.dsa_user_without_login
+DELIMITER //
+CREATE PROCEDURE `dsa_user_without_login`(
+	IN `start_date` DATE,
+	IN `end_date` DATE,
+	IN `account_id` INT,
+	IN `user_assign` VARCHAR(50),
+	IN `dept_id` INT,
+	IN `col` VARCHAR(50),
+	IN `val` VARCHAR(50)
+)
+BEGIN
+	DECLARE myquery nvarchar(2000);
+	DECLARE myquery1 nvarchar(2000);
+						
+	SET myquery  = CONCAT('SELECT DISTINCT u.user_name
+								FROM vtiger_users u
+								LEFT JOIN vtiger_loginhistory l
+								ON l.user_name = u.user_name
+								WHERE 1=1 ');
+	SET myquery = CONCAT(myquery, ' AND u.deleted = ''0'' AND u.status = ''Active''');
+	
+	
+	IF (start_date IS NOT NULL) AND (end_date IS NOT NULL) AND (start_date = end_date) THEN
+		SET myquery  = CONCAT(myquery,' AND DATE(l.login_time) BETWEEN ''', start_date, ''' AND ''',  end_date, ''' '); 
+	END IF;
+
+	SET myquery  = CONCAT(myquery , ' GROUP BY u.user_name ');
+	
+	SET myquery1 = CONCAT ('SELECT DISTINCT u.user_name
+									FROM vtiger_users u	
+			
+									LEFT JOIN vtiger_users2group ug
+									ON ug.userid = u.id
+									
+									LEFT JOIN vtiger_groups g
+									ON g.groupid = ug.groupid
+									
+									WHERE u.deleted =''0'' AND u.status = ''Active''
+									AND u.user_name NOT IN (',myquery,')');	
+				
+	
+	IF (user_assign IS NOT NULL) THEN
+		SET myquery1 = CONCAT(myquery1,' AND u.id = ''', user_assign, '''');
+	END IF;
+	
+	
+	IF (dept_id IS NOT NULL) THEN
+		SET myquery1 = CONCAT(myquery1,' AND g.groupid = ''',dept_id, '''');
+	END IF;
+		
+	
+	IF (col IS NOT NULL) AND (col != 'c.label') AND (col != 'c2.label') THEN
+		SET myquery1 = CONCAT(myquery1,' AND ',col, ' = ''', val,''' ');
+	END IF;	
+	
+	SET myquery1 = CONCAT(myquery1,' GROUP BY u.user_name ORDER BY u.user_name');
+	
+
+	SELECT myquery1;
+	SET @SQL := myquery1;
+	PREPARE my_query FROM @SQL;
+	EXECUTE my_query;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.publish_vtiger_project
+DELIMITER //
+CREATE PROCEDURE `publish_vtiger_project`(
+	IN `p1` VARCHAR(255),
+	IN `p2` VARCHAR(255),
+	IN `p3` VARCHAR(255)
+)
+BEGIN DECLARE cmd CHAR(255); 
+    DECLARE result CHAR(255); 
+    SET cmd = CONCAT('curl http://192.168.1.234:9090/vtiger_project/insert?id=',p1,'%26key=',p2,'%26status=',p3,'%26group=0'); 
+    SET result = sys_exec(cmd);
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.SEND
+DELIMITER //
+CREATE PROCEDURE `SEND`(
+    id INT,
+    user_name VARCHAR(50),
+    ip VARCHAR(50),
+STATUS VARCHAR
+    (50)
+)
+BEGIN
+    DECLARE
+        cmd VARCHAR(255) ; DECLARE result VARCHAR(255) ;
+    SET
+        cmd = CONCAT(
+            'curl http://192.168.1.234:9090/login/insert?id=',
+            id,
+            '%26key=',
+            id,
+            '%26user=',
+            user_name,
+            '%26ip=',
+            ip,
+            '%26status=',
+        REPLACE
+            (
+        STATUS
+            ,
+            ' ',
+            ''
+        )
+        ) ;
+    SET
+        result = sys_exec(cmd) ;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_Card_Overview_KH
+DELIMITER //
+CREATE PROCEDURE `sp_Card_Overview_KH`(IN col CHAR(2), IN value_filter VARCHAR(100), IN ddl_NV VARCHAR(3), IN ddl_TT VARCHAR(30), IN ddl_TP VARCHAR(30), IN ddl_NG VARCHAR(50))
+BEGIN
+	DECLARE _query_ varchar(2000);
+	DECLARE _check INT;
+	SET _check = 0;
+   SET _query_ = CONCAT('SELECT COUNT(vc.crmid) FROM vtiger_crmentity vc');
+	
+   IF (ddl_TP IS NOT NULL) Then
+      SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = N''', ddl_TP, '''',
+                                    ' AND vasp.accountaddressid = vc.crmid');
+      SET _check = 1;
+   END IF;
+    
+   IF (ddl_NG IS NOT NULL) Then
+      SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry = N''', ddl_NG, '''',
+		  										' AND va.accountid = vc.crmid');
+      SET _check = 1;
+   END IF;
+    
+   IF (ddl_TT IS NOT NULL) Then
+    	SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.cf_891 = ''', ddl_TT, '''',
+		  										' AND vas.accountid = vc.crmid');
+      SET _check = 1;
+   END IF;
+    
+   IF (ddl_NV IS NOT NULL AND _check = 1) Then
+      SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+   ELSEIF (ddl_NV IS NOT NULL AND _check = 0) Then
+    	SET _query_ = CONCAT(_query_, ' WHERE vc.smownerid = ', ddl_NV);
+      SET _check = 1;
+   END IF;
+    
+	IF (col = 'NV') Then
+		SET _query_ = CONCAT(_query_,' WHERE vc.smownerid = ', value_filter);
+		SET _check = 1;
+   ELSEIF (col = 'TP') Then
+	   SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = ''', value_filter, '''',
+                                    ' AND vc.crmid = vasp.accountaddressid');
+   ELSEIF (col = 'NG') Then
+      SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry = N''', value_filter, '''',
+		  										' AND va.accountid = vc.crmid');
+	END IF;
+	
+   IF (_check = 1) Then
+		SET _query_ = CONCAT(_query_, ' AND vc.setype = ''Accounts'';');
+   ELSEIF (_check = 0) Then
+    	SET _query_ = CONCAT(_query_, ' WHERE vc.setype = ''Accounts'';');
+   END IF;
+    
+   SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_Card_Overview_NG
+DELIMITER //
+CREATE PROCEDURE `sp_Card_Overview_NG`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TT` VARCHAR(30),
+	IN `ddl_TP` VARCHAR(30)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT COUNT(distinct va.industry) FROM vtiger_account va',
+                         ' JOIN vtiger_crmentity vc ON va.accountid = vc.crmid AND vc.setype = ''Accounts''');
+                         
+	IF (ddl_NV IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    END IF;
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = N''', ddl_TP, '''',
+                                      ' AND vasp.accountaddressid = vc.crmid');
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.accountid = va.accountid',
+                                      ' AND vas.cf_891 = ''', ddl_TT, '''');
+    END IF;
+    
+    IF (col = 'NV') Then
+		SET _query_ = CONCAT(_query_,' AND vc.smownerid = ', value_filter);
+    ELSEIF (col = 'TP') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = ''', value_filter, '''',
+                                      ' AND vc.crmid = vasp.accountaddressid');
+    END IF;
+    
+    SET _query_ = CONCAT(_query_,';');
+    
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_Card_Overview_NV
+DELIMITER //
+CREATE PROCEDURE `sp_Card_Overview_NV`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_TP` VARCHAR(20),
+	IN `ddl_NG` VARCHAR(50),
+	IN `ddl_TT` VARCHAR(30)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT COUNT(distinct vu.id) AS SLNV',
+						 ' FROM vtiger_crmentity vc',
+                         ' JOIN vtiger_users vu ON vc.smownerid = vu.id AND vc.setype = ''Accounts'' AND vu.status = ''Active''');
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city like N''%', ddl_TP, '%''',
+                                      ' AND vasp.accountaddressid = vc.crmid');
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry like N''%', ddl_NG, '%''',
+                                      ' AND va.accountid = vc.crmid');
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.cf_891 = ''', ddl_TT, '''',
+                                      ' AND vas.accountid = vc.crmid');
+    END IF;
+    
+	IF (col = 'TP') Then
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_accountshipads vas ON vc.crmid = vas.accountaddressid AND vas.ship_city LIKE');
+        SET _query_ = CONCAT(_query_,' ''%', value_filter, '%''');
+    ELSEIF (col = 'NG') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry like N''%', value_filter, '%''',
+                                      ' AND va.accountid = vc.crmid');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,';');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_Card_Overview_TP
+DELIMITER //
+CREATE PROCEDURE `sp_Card_Overview_TP`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TT` VARCHAR(30),
+	IN `ddl_NG` VARCHAR(50)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT COUNT(DISTINCT vasp.ship_city)',
+                        ' FROM vtiger_account va JOIN vtiger_accountshipads vasp ON va.accountid = vasp.accountaddressid AND vasp.ship_city != ''''',
+                        ' JOIN vtiger_crmentity vc ON va.accountid = vc.crmid AND vc.setype = ''Accounts''');
+    
+    IF (ddl_NV IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.cf_891 = ''', ddl_TT, '''',
+                                      ' AND vas.accountid = va.accountid');
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND va.industry = N''', ddl_NG, '''');
+    END IF;
+
+    IF (col = 'NV') THEN
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', value_filter);
+    ELSEIF (col = 'NG') THEN
+        SET _query_ = CONCAT(_query_, ' AND va.industry = N''', value_filter, '''');
+    END IF;
+    
+    SET _query_ = CONCAT(_query_, ';');
+	
+	 SET @_query_ = _query_;
+    PREPARE my_query FROM @_query_;
+    EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_ddl_filter_KH
+DELIMITER //
+CREATE PROCEDURE `sp_ddl_filter_KH`(
+	IN `filter_name` CHAR(2)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+	
+	IF (filter_name = 'TT') Then
+		SET _query_ = 'SELECT distinct cf_891 FROM vtiger_accountscf;';
+	END IF;
+
+    IF (filter_name = 'NG') Then
+        SET _query_ = 'SELECT distinct IF(industry IS NULL OR industry = '''', ''Trống'', industry) AS industry FROM vtiger_account ORDER BY industry;';
+	END IF;
+    
+    IF (filter_name = 'TP') Then
+		SET _query_ = 'SELECT DISTINCT ship_city FROM vtiger_accountshipads;';
+	END IF;
+    
+    IF (filter_name = 'NV') Then
+		SET _query_ = CONCAT('SELECT distinct vc.smownerid, CONCAT(vu.last_name, '' '', vu.first_name) AS HoTen ',
+                             'FROM vtiger_users vu JOIN vtiger_crmentity vc ',
+                             'ON vu.status = ''Active'' AND vu.id = vc.smownerid AND vc.setype = ''Accounts'';');
+	END IF;
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_Demo
+DELIMITER //
+CREATE PROCEDURE `sp_Demo`(IN ddl_TP VARCHAR(30))
+BEGIN
+	DECLARE i INT;
+	SET i = 0;
+	IF (ddl_TP IS NOT NULL) Then
+		SET i = 1;
+	END IF;
+	SELECT i;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_KH_TT
+DELIMITER //
+CREATE PROCEDURE `sp_KH_TT`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TP` VARCHAR(20),
+	IN `ddl_NG` VARCHAR(50)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT CASE WHEN vas.cf_891 = '''' Then ''Không có trạng thái'' ELSE vas.cf_891 END, COUNT(*) SLKH',
+						 ' FROM vtiger_accountscf vas',
+                         ' JOIN vtiger_crmentity vc ON vc.setype = ''Accounts'' AND vas.accountid = vc.crmid');
+    
+    IF (ddl_NV IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    END IF;
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city like N''%', ddl_TP, '%''',
+                                      ' AND vas.accountid = vasp.accountaddressid');
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry like N''%', ddl_NG, '%''',
+                                      ' AND va.accountid = vas.accountid');
+    END IF;
+    
+	IF (col = 'NV') Then
+		SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', value_filter);
+    ELSEIF (col = 'TP') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = N''', value_filter, '''',
+                             ' AND vas.accountid = vasp.accountaddressid');
+    ELSEIF (col = 'NG') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry like N''%', value_filter, '%''',
+                                      ' AND va.accountid = vas.accountid');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY vas.cf_891 ORDER BY SLKH desc;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_NG_SLKH
+DELIMITER //
+CREATE PROCEDURE `sp_NG_SLKH`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TT` VARCHAR(30),
+	IN `ddl_TP` VARCHAR(30)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT CASE WHEN va.industry IS NULL OR va.industry = '''' THEN N''Trống''',
+                         ' ELSE va.industry END AS Nganh, COUNT(va.accountid) SLKH FROM vtiger_account va',
+                         ' JOIN vtiger_crmentity vc ON va.accountid = vc.crmid AND vc.setype = ''Accounts''');
+                         
+	IF (ddl_NV IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    END IF;
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = N''', ddl_TP, '''',
+                                      ' AND vasp.accountaddressid = vc.crmid');
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.accountid = va.accountid',
+                                      ' AND vas.cf_891 = ''', ddl_TT, '''');
+    END IF;
+    
+    IF (col = 'NV') Then
+		SET _query_ = CONCAT(_query_,' AND vc.smownerid = ', value_filter);
+    ELSEIF (col = 'TP') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = ''', value_filter, '''',
+                                      ' AND vc.crmid = vasp.accountaddressid');
+    END IF;
+    
+    SET _query_ = CONCAT(_query_,' GROUP BY Nganh ORDER BY SLKH desc;');
+    
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_NV_KH_TT
+DELIMITER //
+CREATE PROCEDURE `sp_NV_KH_TT`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TT` VARCHAR(30),
+	IN `ddl_TP` VARCHAR(30),
+	IN `ddl_NG` VARCHAR(50)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT CONCAT(vu.last_name, '' '', vu.first_name) AS HoTen, va.accountname, vas.cf_891 AS TT',
+						 ' FROM vtiger_account va JOIN vtiger_accountscf vas ON va.accountid = vas.accountid');
+	
+    SET _query_ = CONCAT(_query_, ' JOIN vtiger_crmentity vc ON',
+                                  ' va.accountid = vc.crmid AND vc.setype = ''Accounts''',
+                                  ' JOIN vtiger_users vu ON vc.smownerid = vu.id');
+    IF (ddl_NV IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    END IF;
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = N''', ddl_TP, '''',
+                                      ' AND vasp.accountaddressid = vc.crmid');
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND va.industry = N''', ddl_NG, '''');
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vas.cf_891 = ''', ddl_TT, '''');
+    END IF;
+    
+	IF (col = 'NV') Then
+		SET _query_ = CONCAT(_query_,' AND vc.smownerid = ', value_filter);
+    ELSEIF (col = 'TP') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = ''', value_filter, '''',
+                                      ' AND va.accountid = vasp.accountaddressid');
+    ELSEIF (col = 'NG') Then
+        SET _query_ = CONCAT(_query_, ' AND va.industry = N''', value_filter, '''');
+	END IF;
+    
+    IF (col = '20') Then
+        SET _query_ = CONCAT(_query_, ' LIMIT 20;');
+    ELSEIF (col = '40') Then
+        SET _query_ = CONCAT(_query_, ' LIMIT 40;');
+    ELSEIF (col = '60') Then
+        SET _query_ = CONCAT(_query_, ' LIMIT 60;');
+    ELSEIF (col = '80') Then
+        SET _query_ = CONCAT(_query_, ' LIMIT 80;');
+    ELSEIF (col = 'AL') Then
+        SET _query_ = CONCAT(_query_, ';');
+    ELSE
+        SET _query_ = CONCAT(_query_, ' LIMIT 20;');
+    END IF;
+   
+   SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_NV_SLKH
+DELIMITER //
+CREATE PROCEDURE `sp_NV_SLKH`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_TP` VARCHAR(20),
+	IN `ddl_NG` VARCHAR(50),
+	IN `ddl_TT` VARCHAR(30)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT vc.smownerid AS ID, CONCAT(vu.last_name, '' '', vu.first_name) AS HoTen, COUNT(vc.crmid) AS SoLuongKH, vu.status',
+						 ' FROM vtiger_crmentity vc',
+                         ' JOIN vtiger_users vu ON vc.smownerid = vu.id AND vc.setype = ''Accounts''');
+    
+    
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city like N''%', ddl_TP, '%''',
+                                      ' AND vasp.accountaddressid = vc.crmid');
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry like N''%', ddl_NG, '%''',
+                                      ' AND va.accountid = vc.crmid');
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.cf_891 = ''', ddl_TT, '''',
+                                      ' AND vas.accountid = vc.crmid');
+    END IF;
+    
+	IF (col = 'TP') Then
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_accountshipads vas ON vc.crmid = vas.accountaddressid AND vas.ship_city LIKE');
+        SET _query_ = CONCAT(_query_,' ''%', value_filter, '%''');
+    ELSEIF (col = 'NG') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry like N''%', value_filter, '%''',
+                                      ' AND va.accountid = vc.crmid');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY vc.smownerid ORDER BY COUNT(vc.crmid) DESC;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TG_SLKH
+DELIMITER //
+CREATE PROCEDURE `sp_TG_SLKH`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TT` VARCHAR(30),
+	IN `ddl_TP` VARCHAR(30),
+	IN `ddl_NG` VARCHAR(50)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    DECLARE _check INT;
+	 SET _check = 0;
+    SET _query_ = CONCAT('SELECT DATE_FORMAT(vc.createdtime,''%Y-%m'') Month_Year, COUNT(vc.crmid)',
+						 		 ' FROM vtiger_crmentity vc');
+    
+    IF (ddl_TP IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = N''', ddl_TP, '''',
+                                      ' AND vasp.accountaddressid = vc.crmid');
+        SET _check = 1;
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry = N''', ddl_NG, '''',
+		  										  ' AND va.accountid = vc.crmid');
+        SET _check = 1;
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+    	  SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.cf_891 = ''', ddl_TT, '''',
+		  										  ' AND vas.accountid = vc.crmid');
+        SET _check = 1;
+    END IF;
+    
+    IF (ddl_NV IS NOT NULL AND _check = 1) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    ELSEIF (ddl_NV IS NOT NULL AND _check = 0) Then
+    	  SET _query_ = CONCAT(_query_, ' WHERE vc.smownerid = ', ddl_NV);
+        SET _check = 1;
+    END IF;
+    
+	IF (col = 'NV') Then
+		SET _query_ = CONCAT(_query_,' WHERE vc.smownerid = ', value_filter);
+		SET _check = 1;
+    ELSEIF (col = 'TP') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountshipads vasp ON vasp.ship_city = ''', value_filter, '''',
+                                      ' AND vc.crmid = vasp.accountaddressid');
+    ELSEIF (col = 'NG') Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_account va ON va.industry = N''', value_filter, '''',
+		  										  ' AND va.accountid = vc.crmid');
+	END IF;
+	
+    IF (_check = 1) Then
+    	  SET _query_ = CONCAT(_query_, ' AND vc.setype = ''Accounts''');
+    ELSEIF (_check = 0) Then
+    	  SET _query_ = CONCAT(_query_, ' WHERE vc.setype = ''Accounts''');
+    END IF;
+	
+	SET _query_ = CONCAT(_query_, ' GROUP BY Month_Year;');
+   
+   SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_Group
+DELIMITER //
+CREATE PROCEDURE `sp_TN_Group`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN 
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT vtiger_groups.groupname, count(vtiger_users2group.userid)',
+									' FROM vtiger_users2group',
+									' INNER JOIN vtiger_groups ON vtiger_users2group.groupid = vtiger_groups.groupid',
+									' INNER JOIN vtiger_crmentity vc ON vtiger_users2group.userid = vc.smownerid',
+									' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+									
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+		
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+		
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+		
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+		
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+		
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+		
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' WHERE vc.setype=''Leads''');
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY vtiger_groups.groupname',
+											' ORDER BY count(vtiger_users2group.userid) DESC;');
+	
+	SET @_query_ = _query_;								
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_HDNV
+DELIMITER //
+CREATE PROCEDURE `sp_TN_HDNV`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT activitytype HDNV, count(va.activitytype) SLHD',
+								' FROM vtiger_activity AS va JOIN vtiger_seactivityrel AS vse ON va.activityid = vse.activityid',
+								' JOIN vtiger_crmentity vc ON vse.crmid = vc.crmid AND vc.setype = ''Leads''',
+								' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+	
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	 
+	SET _query_ = CONCAT(_query_,' GROUP BY va.activitytype ORDER BY count(va.activitytype) DESC ;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_Nganh
+DELIMITER //
+CREATE PROCEDURE `sp_TN_Nganh`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT(' SELECT vl.industry NGANH, COUNT(vl.leadid) SL',
+								' FROM vtiger_crmentity vc JOIN vtiger_leaddetails vl ON vc.crmid = vl.leadid AND vc.setype = ''Leads''');
+								
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF (NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY NGANH ORDER BY SL ASC ;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_NGUON
+DELIMITER //
+CREATE PROCEDURE `sp_TN_NGUON`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT ('SELECT leadsource AS TenNguon, COUNT(vc.crmid) SLN',
+								' FROM vtiger_crmentity vc JOIN vtiger_leaddetails vl ON vc.crmid = vl.leadid');
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' AND vc.setype = ''Leads''');
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY leadsource ORDER BY SLN DESC;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_NGUON_TP
+DELIMITER //
+CREATE PROCEDURE `sp_TN_NGUON_TP`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT vla.city AS TenTP, COUNT(vc.crmid) SLN',
+								' FROM vtiger_crmentity vc JOIN vtiger_leaddetails vl ON vc.crmid =  vl.leadid AND vc.setype = ''Leads''',
+								' JOIN vtiger_leadaddress vla ON vl.leadid = vla.leadaddressid');
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY TenTP ORDER BY SLN DESC;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_NV
+DELIMITER //
+CREATE PROCEDURE `sp_TN_NV`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN 
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT vu.user_name, count(vc.crmid)',
+								' FROM vtiger_users vu INNER JOIN vtiger_crmentity vc ON vu.id = vc.smownerid',
+								' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+									
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');	
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');	
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');	
+	END IF;
+
+	SET _query_ = CONCAT(_query_,' WHERE vc.setype=''Leads''');
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY vu.user_name',
+											' ORDER BY count(vc.crmid) DESC;');
+	
+	SET @_query_ = _query_;										
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_SELECT_ddl
+DELIMITER //
+CREATE PROCEDURE `sp_TN_SELECT_ddl`(
+	IN `TP` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `NGUON` VARCHAR(100)
+)
+BEGIN
+	IF(TP IS NOT NULL)THEN
+		SELECT vla.city FROM vtiger_leadaddress vla join vtiger_leaddetails vld ON vla.leadaddressid = vld.leadid 
+															JOIN vtiger_crmentity vc ON vc.crmid = vld.leadid and vla.city != '' AND vc.setype = 'Leads'
+		GROUP BY vla.city;
+	END IF;
+	
+	IF(NGANH IS NOT NULL)THEN
+		SELECT vld.industry FROM vtiger_leaddetails vld JOIN vtiger_crmentity vc ON vld.leadid = vc.crmid AND vc.setype = 'Leads'
+		GROUP BY vld.industry;
+	END IF;
+	
+	IF(NV IS NOT NULL)THEN
+		SELECT vu.user_name ,CONCAT(vu.last_name,' ',vu.first_name) TenNV 
+		FROM vtiger_users vu JOIN vtiger_crmentity vc ON vu.id = vc.smownerid
+		GROUP BY vu.user_name, TenNV;
+	END IF;
+	
+	IF(NGUON IS NOT NULL)THEN
+		SELECT vls.leadsource FROM vtiger_leadsource vls;
+	END IF;
+	
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_SLHD
+DELIMITER //
+CREATE PROCEDURE `sp_TN_SLHD`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(10),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT COUNT(va.activityid)',
+								' FROM vtiger_activity va JOIN vtiger_seactivityrel vse ON va.activityid = vse.activityid',
+								' JOIN vtiger_crmentity vc ON vc.crmid = vse.crmid AND vc.setype = ''Leads''',
+								' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_SLHDNV
+DELIMITER //
+CREATE PROCEDURE `sp_TN_SLHDNV`(
+	IN `TP` VARCHAR(200),
+	IN `NGUON` VARCHAR(200),
+	IN `NGANH` VARCHAR(200),
+	IN `NV` VARCHAR(200),
+	IN `col` VARCHAR(200),
+	IN `_values_` VARCHAR(200)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT vu.user_name user , COUNT(va.activityid) SLHD',
+								' FROM vtiger_activity AS va JOIN vtiger_seactivityrel AS vse ON va.activityid = vse.activityid',
+								' JOIN vtiger_crmentity vc ON vse.crmid = vc.crmid AND vc.setype = ''Leads''',
+								' JOIN vtiger_users vu ON vc.smownerid = vu.id',
+								' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+								
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY user_name ORDER BY SLHD DESC;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_SLHD_TG
+DELIMITER //
+CREATE PROCEDURE `sp_TN_SLHD_TG`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('	SELECT COUNT(va.activityid) SLHD, DATE_FORMAT(va.date_start,''%Y-%m'') AS date_time',
+								' FROM vtiger_activity va JOIN vtiger_seactivityrel vs ON va.activityid = vs.activityid',
+								' JOIN vtiger_crmentity vc ON vs.crmid = vc.crmid AND vc.setype = ''Leads'' AND YEAR(va.date_start) > 2016',
+								' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+	
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY date_time;');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_SLNGUON
+DELIMITER //
+CREATE PROCEDURE `sp_TN_SLNGUON`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT COUNT(vc.crmid) FROM vtiger_crmentity vc',
+								' JOIN vtiger_leaddetails vl ON vl.leadid = vc.crmid');
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND DATE_FORMAT(va.date_start,''%Y-%m'') =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'TGNGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+		
+	SET _query_ = CONCAT(_query_,' WHERE vc.setype = ''Leads''');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TN_SLNGUON_TG
+DELIMITER //
+CREATE PROCEDURE `sp_TN_SLNGUON_TG`(
+	IN `TP` VARCHAR(100),
+	IN `NGUON` VARCHAR(100),
+	IN `NGANH` VARCHAR(100),
+	IN `NV` VARCHAR(100),
+	IN `col` VARCHAR(100),
+	IN `_values_` VARCHAR(100)
+
+)
+BEGIN 
+	DECLARE _query_ VARCHAR(2000);
+	SET _query_ = CONCAT('SELECT COUNT(vc.crmid) SLN,DATE_FORMAT(vc.createdtime,"%Y-%m" ) TG',
+								' FROM vtiger_crmentity vc JOIN vtiger_leaddetails as vl ON vc.crmid = vl.leadid',
+								' AND vc.setype = ''Leads'' AND YEAR(vc.createdtime) != 7687 AND YEAR(vc.createdtime) > 2016');
+	
+	IF (TP IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',TP,'''');
+	END IF;
+	
+	IF (NGUON IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',NGUON,'''');
+	END IF;
+	
+	IF (NGANH IS NOT NULL) THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',NGANH,'''');
+	END IF;
+	
+	IF(NV IS NOT NULL) THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',NV,'''');
+	END IF;
+	
+	IF (col = 'TP')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_leadaddress vla ON vla.leadaddressid = vl.leadid AND vla.city = ''',_values_,'''');
+	ELSEIF (col = 'NGUON')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.leadsource =''',_values_,'''');
+	ELSEIF (col = 'NGANH')THEN
+		SET _query_ = CONCAT(_query_,' AND vl.industry =''',_values_,'''');
+	ELSEIF (col = 'NV')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_users vu ON vu.id = vc.smownerid AND vu.user_name =''',_values_,'''');
+	ELSEIF (col = 'HD')THEN
+		SET _query_ = CONCAT(_query_,' JOIN vtiger_seactivityrel vse ON vc.crmid = vse.crmid JOIN vtiger_activity va ON va.activityid = vse.activityid AND va.activitytype =''',_values_,'''');
+	ELSEIF (col = 'TGHD')THEN
+		SET _query_ = CONCAT(_query_,' AND DATE_FORMAT(vc.createdtime,"%Y-%m") =''',DATE_FORMAT(_values_,'%Y-%m'),'''');
+	ELSEIF (col = 'Group')THEN
+		SET _query_ = CONCAT (_query_,' JOIN vtiger_users2group vu2g ON vc.smownerid = vu2g.userid JOIN vtiger_groups vg ON vu2g.groupid = vg.groupid AND vg.groupname = ''',_values_,'''');
+	END IF;
+	
+	SET _query_ = CONCAT(_query_,' GROUP BY TG');
+	
+	SET @_query_ = _query_;
+	PREPARE my_query FROM @_query_;
+	EXECUTE my_query;
+END//
+DELIMITER ;
+
+-- Dumping structure for procedure crm.sp_TP_SLKH
+DELIMITER //
+CREATE PROCEDURE `sp_TP_SLKH`(
+	IN `col` CHAR(2),
+	IN `value_filter` VARCHAR(100),
+	IN `ddl_NV` VARCHAR(3),
+	IN `ddl_TT` VARCHAR(30),
+	IN `ddl_NG` VARCHAR(50)
+)
+BEGIN
+    DECLARE _query_ VARCHAR(2000);
+    SET _query_ = CONCAT('SELECT va.accountid ID, vasp.ship_city, COUNT(vasp.ship_city) SLKH',
+                        ' FROM vtiger_account va JOIN vtiger_accountshipads vasp ON va.accountid = vasp.accountaddressid',
+                        ' JOIN vtiger_crmentity vc ON va.accountid = vc.crmid AND vc.setype = ''Accounts''');
+    
+    
+    IF (ddl_NV IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', ddl_NV);
+    END IF;
+    
+    IF (ddl_TT IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' JOIN vtiger_accountscf vas ON vas.cf_891 = ''', ddl_TT, '''',
+                                      ' AND vas.accountid = va.accountid');
+    END IF;
+    
+    IF (ddl_NG IS NOT NULL) Then
+        SET _query_ = CONCAT(_query_, ' AND va.industry = N''', ddl_NG, '''');
+    END IF;
+
+    IF (col = 'NV') THEN
+        SET _query_ = CONCAT(_query_, ' AND vc.smownerid = ', value_filter);
+    ELSEIF (col = 'NG') THEN
+        SET _query_ = CONCAT(_query_, ' AND va.industry = N''', value_filter, '''');
+    END IF;
+    
+    SET _query_ = CONCAT(_query_, ' GROUP BY vasp.ship_city ORDER BY SLKH DESC;');
+	 
+	 SET @_query_ = _query_;
+    PREPARE my_query FROM @_query_;
+    EXECUTE my_query;
 END//
 DELIMITER ;
 
